@@ -1,20 +1,25 @@
+# global variables
+# n = number of computers in the network
+n = 10
+# k = number of people who have to agree
+k = 4
+# M = A prime Number where M > N
+
+
 class Network:
-    def __init__(self):
+    def __init__(self, sayingYes = []):
         self.nodes = set()
-    def addNode(self,node):
-        self.nodes.add(node)
+        for i in range(n):
+            if i in sayingYes:
+                self.nodes.add(Computer(True))
+            else:
+                self.nodes.add(Computer(False))
     def getNodes(self):
         retuern self.nodes
 
 class Computer:
-    def __init__(self, interactive, agree, network):
-        self.interactive = interactive
+    def __init__(self, agree):
         self.agree = agree
-        network.addNode(self)
-        self.nodes = network.getNodes()
-    def updateNodes(self):
-        self.nodes = 
-
     def changeChoice(self, agree):
         self.agree = agree
 

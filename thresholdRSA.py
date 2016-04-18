@@ -1,9 +1,18 @@
+from helpers import *
 # global variables
 # n = number of computers in the network
 n = 10
 # k = number of people who have to agree
 k = 4
+
+# N = public modulus
+# for now lets just make the the product of 2 large random primes
+bitsSecure = 1024
+N = getRandomPrime(2**bitsSecure,2**(bitsSecure+1)-1)*getRandomPrime(2**bitsSecure,2**(bitsSecure+1)-1)
+print N
+
 # M = A prime Number where M > N
+M = getRandomPrime(N,2*N)
 
 
 class Network:
@@ -15,7 +24,7 @@ class Network:
             else:
                 self.nodes.add(Computer(False))
     def getNodes(self):
-        retuern self.nodes
+        return self.nodes
 
 class Computer:
     def __init__(self, agree):

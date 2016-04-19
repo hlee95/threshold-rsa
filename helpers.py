@@ -20,13 +20,14 @@ class PresigningData:
         self.lamdba_t_i = None
         self.s_t_i = None
         self.h_t_i = None
+        self.received_h_t_i = [] # contains tuples with the (id, h_t_i) of all k computers
 
         self.sigma_I_t_i = None # signature on the dummy message
-        self.received_sigma_I_t_i = [] # the sigma_I_t_i of other computers
-        self.c_prime_t_i = [] # signature share (without the proof)
+        self.received_sigma_I_t_i = [] # contains tuples with the (id, sigma_I_t_i) of all k computers
         self.x_I = None
+        self.received_x_I = [] # contains tuples with (id, x_I) computed by other parties, length of array = k-1
 
-        self.D_I = None
-        self.S_I_t_i = None
+        self.D_I = None # will contain tuples of the form (x_I, [(id, h_t_i, c_prime_t_i)])
+        self.S_I_t_i = None # will contain simply s_t_i
 
 

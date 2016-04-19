@@ -1,4 +1,6 @@
 from helpers import *
+import copy
+
 # global variables
 # n = number of computers in the network
 n = 10
@@ -41,7 +43,6 @@ class Network:
     Produce a valid signature for the given message if at least k parties agree.
     '''
     def sign(self, message):
-        global k
         # If fewer than k parties say yes, then abort and don't sign.
         agreed_parties = [computer for computer in self.nodes if computer.agree]
         if len(agreed_parties) < k:
@@ -55,20 +56,35 @@ class Network:
         # If this set of parties has not previously run the
         # subset presigning algorithm before, then run it
         if I not in I[0].subsets:
-            print "Subset presigning algorithm!"
-            for t_i in I:
-                t_i.subset_presigning_algorithm_phase_1(I, I_prime)
-            # Use more for-loops because all of phase 1 (the broadcast phase) must complete
-            # before any party can start phase 2, and likewise with phase 2 and phase 3.
-            for t_i in I:
-                t_i.subset_presigning_algorithm_phase_2()
-            for t_i in I:
-                t_i.subset_presigning_algorithm_phase_3()
+            self.subset_presigning_algorithm(I, I_prime)
+            print I[0].get_current_subset_presigning_data()
+        else:
+            print "This subset has already run the presigning algorithm."
 
         ''' major TODO: all this stuff '''
         # Have each party generate a signature share and proof
         #     (so basically do 6.2.3 and 6.2.4)
         # Then, have each party do the share combining, so do 6.2.5
+
+
+    '''
+    Implements the subset presigning algorithm.
+    I is the set of k parties, and I_prime is the remaining n-k parties.
+    '''
+    def subset_presigning_algorithm(self, I, I_prime):
+        print "Subset presigning algorithm!"
+        for t_i in I:
+            t_i.subset_presigning_algorithm_phase_0(I, I_prime)
+        # Use more for-loops because all of phase 1 must complete
+        # before any party can start phase 2, and likewise with the subsequent phases.
+        for t_i in I:
+            t_i.subset_presigning_algorithm_phase_1()
+        for t_i in I:
+            t_i.subset_presigning_algorithm_phase_2()
+        for t_i in I:
+            t_i.subset_presigning_algorithm_phase_3()
+        for t_i in I:
+            t_i.subset_presigning_algorithm_phase_4()
 
 class Computer:
     def __init__(self, _id, agree):
@@ -76,19 +92,17 @@ class Computer:
         self.agree = agree
 
         # This computer's share of the secret key
-        self.d_i = None
+        self.d_i = 0
 
         # Variables for the dealing algorithm
-        self.f_i_j = [0] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
+        self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
 
         # Variables for the subset presigning algorithm
-        global e
         self.dummy_message = 2**e # TODO maybe use gmpy2 for this
         self.I = None # the current subset
         self.I_prime = None # the complement of the current subset
         self.subsets = [] # this is a history of all subsets that this computer has been part of
         self.presigning_data = {} # maps subset -> this computer's presigning data for that subset
-
 
     '''
     Change this computer's vote to be yes or no (set agree to True or False)
@@ -125,8 +139,30 @@ class Computer:
     Receive a broadcast of a different computer's sigma_I_t_i
     for the dummy message during the presigning phase.
     '''
-    def receive_presigning_sigma_I_t_i(self, sigma):
-        self.presigning_data[self.I].received_sigma_I_t_i.append(sigma)
+    def receive_presigning_sigma_I_t_i(self, id_and_sigma):
+        self.presigning_data[self.I].received_sigma_I_t_i.append(id_and_sigma)
+
+    '''
+    Receive a broadcast of a different computer's h_t_i
+    and the computer's id, as a tuple.
+    '''
+    def receive_presigning_h_t_i(self, id_and_h_t_i):
+        self.presigning_data[self.I].received_h_t_i.append(id_and_h_t_i)
+
+    '''
+    Receive a broadcast of a different computer's calculated x_I
+    and the computer's id, as a tuple.
+    '''
+    def receive_presigning_x_I(self, id_and_x_I):
+        self.presigning_data[self.I].received_x_I.append(id_and_x_I)
+
+
+    '''
+    Returns a copy of the current subset presigning data.
+    '''
+    def get_current_subset_presigning_data(self):
+        return (copy.deepcopy(self.presigning_data[self.I].S_I_t_i),
+            copy.deepcopy(self.presigning_data[self.I].D_I))
 
     '''
     Runs the subset presigning algorithm, where <computers>
@@ -136,10 +172,10 @@ class Computer:
     Note that this only needs to be run ONCE for each unique
     subset of k computers that wish to sign a message.
 
-    Phase 1 involves calculating lambda_t_i, s_t_i, and h_t_i.
+    Phase 0 involves setting I and I_prime and initializing
+    the PresigningData instance.
     '''
-    def subset_presigning_algorithm_phase_1(self, I, I_prime):
-        global N
+    def subset_presigning_algorithm_phase_0(self, I, I_prime):
         # Sanity check to make sure we haven't already run the algorithm for this subset.
         if I in self.subsets:
             raise RuntimeError("Should not run subset presigning algorithm (phase 1) on a previously seen subset.")
@@ -150,60 +186,118 @@ class Computer:
         self.presigning_data[I] = PresigningData()
         print "Hi I am computer %d." % self.id # Remove after debugging
 
+    '''
+    Phase 1 involves calculating lambda_t_i, s_t_i, and h_t_i,
+    and broadcasting h_t_i.
+    '''
+    def subset_presigning_algorithm_phase_1(self):
         # Compute lambda_t_i
         lambda_t_i = 1
-        for computer in I:
+        for computer in self.I:
             if computer.id == self.id:
                 continue
             lambda_t_i *= (computer.id + 1)/(computer.id - self.id) # We need the "+1" because otherwise we could get 0
             lambda_t_i %= M
-        self.presigning_data[I].lambda_t_i = lambda_t_i
+        self.presigning_data[self.I].lambda_t_i = lambda_t_i
 
         # Compute s_t_i
-        I_prime_ids = map(lambda computer: computer.id, I_prime)
+        I_prime_ids = map(lambda computer: computer.id, self.I_prime)
         s_t_i = (sum([self.f_i_j[i] for i in I_prime_ids]) * lambda_t_i) % M
-        self.presigning_data[I].s_t_i = s_t_i
+        self.presigning_data[self.I].s_t_i = s_t_i
 
         # Compute h_t_i
         h_t_i = (g**(s_t_i)) % N # TODO maybe use gmpy2 for this
-        self.presigning_data[I].h_t_i = h_t_i
+        self.presigning_data[self.I].h_t_i = h_t_i
 
+        # Broadcast h_t_i so other computers can use it to verify later,
+        # and also broadcast to yourself just so your array is complete with all k elements.
+        for computer in self.I:
+            computer.receive_presigning_h_t_i((self.id, h_t_i))
 
     '''
     Phase 2 involves computing the signature share on a dummy message,
-    and broadcasting the signature share.
+    and broadcasting the signature share to every other party in I.
     '''
     def subset_presigning_algorithm_phase_2(self):
         # Compute the signature share.
         signature_share = self.signature_share_generation(self.dummy_message)
-        # Broadcast this signature share to all k-1 other computers in the group.
+        # Broadcast this signature share to all k-1 other computers in the group,
+        # and also "broadcast" to yourself so your array has all k signature shares.
         for computer in self.I:
-            if computer.id != self.id:
-                computer.receive_presigning_sigma_I_t_i(signature_share)
+            computer.receive_presigning_sigma_I_t_i((self.id, signature_share))
 
     '''
-    Phase 3 involves solving for verifying the signature shares,
-    finding x_I via exhaustive search, and then setting D_I and S_I_t_i for this subset.
+    Phase 3 involves verifying the signature shares that have been broadcasted,
+    finding x_I via exhaustive search, and then broadcasting x_I.
     '''
     def subset_presigning_algorithm_phase_3(self):
-        global k
         # Check that we received a signature share from all k-1 other computers in the group.
-        if len(self.presigning_data[self.I].received_sigma_I_t_i) != k-1:
-            print "Didn't receive signature share on dummy message from k-1 other parties."
-            #raise RuntimeError("Didn't receive signature share on dummy message from k-1 other parties.")
+        if len(self.presigning_data[self.I].received_sigma_I_t_i) != k:
+            # print "Didn't receive signature share on dummy message from k-1 other parties."
+            raise RuntimeError("Didn't receive signature share on dummy message from k-1 other parties.")
 
         # Verify each signature share.
         for sigma in self.presigning_data[self.I].received_sigma_I_t_i:
             if not self.signature_share_verification(sigma):
-                print "Invalid signature on dummy message in subset presigning."
-                #raise RuntimeError("Invalid signature on dummy message in subset presigning.")
+                #print "Invalid signature on dummy message in subset presigning."
+                raise RuntimeError("Invalid signature on dummy message in subset presigning.")
 
         # If everything checks out, then continue on with the algorithm.
 
-        # Find x_I
+        # Find x_I by checking all possible values
+        possible_x_I = range(k-n, k+1) # x_I can be between k-n and k inclusive.
+        # Calculate the product of the received signature shares.
+        product_c_prime_t_i = (reduce(lambda x,y: x*y,
+            map(lambda sigma: sigma[0],
+                self.presigning_data[self.I].received_sigma_I_t_i))) % N
+        # Calculate 2^(e*M)
+        two_e_M = (2 ** (e*M)) % N
+        # Search for the value of x_I that makes the product = 2 * (2^(e*M*x_I))
+        x_I = None
+        for x in possible_x_I:
+            if product_c_prime_t_i == (2 * (two_e_M)**(x)):
+                x_I = x
+                break
+        if x_I is None:
+            x_I = 0 # random number for testing
+            # raise RuntimeError("Couldn't find viable x_I in subset presigning algorithm, computer " + str(self.id))
+        self.presigning_data[self.I].x_I = x_I
+
+        # Broadcast x_I so everyone can verify that they found the same x_I
+        for computer in self.I:
+            if computer.id != self.id:
+                computer.receive_presigning_x_I((self.id, x_I))
+
+    '''
+    Phase 4 involves verifying the x_I that have been broadcasted,
+    and then setting D_I and S_I_t_i for this subset.
+    '''
+    def subset_presigning_algorithm_phase_4(self):
+        # Verify all received x_I (check that they are the same as what we found).
+        if len(self.presigning_data[self.I].received_x_I) != k-1:
+            raise RuntimeError("Didn't receive enough x_I values in subset presigning.")
+        for _id, x in self.presigning_data[self.I].received_x_I:
+            if x != self.presigning_data[self.I].x_I:
+                print "Computer %d broadcasted x_I value %d, but this computer (%d) has x_I value %d" %(_id, x, self.id, self.presigning_data[self.I].x_I)
+                raise RuntimeError("Didn't match x_I.")
+
         # Set D_I and S_I_t_i
+        self.presigning_data[self.I].S_I_t_i = self.presigning_data[self.I].s_t_i # seems stupid but they do it in the paper
+        # Aggregate the received sigmas and h_t_i into an array
+        h_sigma_array = []
+        # Make sure we have k sigmas and k h_t_i values.
+        if len(self.presigning_data[self.I].received_sigma_I_t_i) != k or len(self.presigning_data[self.I].received_h_t_i) != k:
+            raise RuntimeError("Didn't receive k sigmas or h_t_i values.")
+        # Match them up and aggregate into h_sigma_array
+        for id_s, sigma in self.presigning_data[self.I].received_sigma_I_t_i:
+            for id_h, h_t_i in self.presigning_data[self.I].received_h_t_i:
+                if id_s == id_h:
+                    h_sigma_array.append((id_s, h_t_i, sigma[0]))
+        # Make sure that we got k tuples after matching, otherwise there are unmatched values.
+        if len(h_sigma_array) != k:
+            raise RuntimeError("Couldn't match h_t_i and sigma values appropriately.")
 
-
+        self.presigning_data[self.I].D_I = (self.presigning_data[self.I].x_I, h_sigma_array)
 
     ###############################################################
     # Stuff for the Signature Share Generation and Verification
@@ -214,7 +308,7 @@ class Computer:
     returns a tuple containing a signature and a proof.
     '''
     def signature_share_generation(self, m):
-        pass
+        return (1, None) # just returning a random tuple here for testing
 
     '''
     Given a tuple sigma_I_t_i (using same name as in the paper) that
@@ -237,13 +331,5 @@ class Computer:
     def combine_signatures(self):
         pass
 
-#############################################
-# Testing Area
-#############################################
 
-network = Network(range(3))
-network.sign("blah")
-print
-network.nodes[5].change_choice(True)
-network.sign("bloop")
 

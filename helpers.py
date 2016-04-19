@@ -53,7 +53,6 @@ class PresigningData:
         self.received_h_t_i = [] # contains tuples with the (id, h_t_i) of all k computers
 
         self.sigma_I_t_i = None # signature on the dummy message
-        self.received_sigma_I_t_i = [] # contains tuples with the (id, sigma_I_t_i) of all k computers
         self.x_I = None
         self.received_x_I = [] # contains tuples with (id, x_I) computed by other parties, length of array = k-1
 

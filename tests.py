@@ -16,19 +16,19 @@ def hanna_subset_presigning_test():
     print "---------------------------------------"
     network = Network(range(4, 7))
     print "Try with 3 people."
-    network.sign("apples")
+    network.sign(100)
     print "\nTry with 4 people."
     network.nodes[2].change_choice(True)
-    network.sign("bloop")
+    network.sign(200)
     print "\nTry with same 4 people."
     network.nodes[8].change_choice(True)
-    network.sign("candy")
+    network.sign(300)
     print "\nRemove one person."
     network.nodes[2].change_choice(False)
-    network.sign("doodle")
+    network.sign(400)
     print "\nAdd back in the removed person."
     network.nodes[2].change_choice(True)
-    network.sign("elephant")
+    network.sign(500)
 
 def run_all_tests():
     hanna_subset_presigning_test()

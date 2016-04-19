@@ -7,9 +7,9 @@ n = 10
 # k = number of people who have to agree
 k = 4
 # g is an agreed upon element in Z*_n that has high order
-g = 0 # TODO compute this
+g = 101 # TODO compute this
 # e = the public key
-e = 0 # TODO compute this
+e = 1 # TODO compute this
 
 # N = public modulus
 # for now lets just make the the product of 2 large random primes
@@ -57,7 +57,9 @@ class Network:
         # subset presigning algorithm before, then run it
         if I not in I[0].subsets:
             self.subset_presigning_algorithm(I, I_prime)
-            print I[0].get_current_subset_presigning_data()
+            for i in xrange(k):
+                for item in I[i].get_current_subset_presigning_data():
+                    print item
         else:
             print "This subset has already run the presigning algorithm."
 
@@ -68,8 +70,9 @@ class Network:
 
 
     '''
-    Implements the subset presigning algorithm.
-    I is the set of k parties, and I_prime is the remaining n-k parties.
+    Implements the subset presigning algorithm in multiple phases.
+    I is the set of k agreeing parties,
+    and I_prime is the remaining set of n-k parties.
     '''
     def subset_presigning_algorithm(self, I, I_prime):
         print "Subset presigning algorithm!"
@@ -98,11 +101,18 @@ class Computer:
         self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
 
         # Variables for the subset presigning algorithm
-        self.dummy_message = 2**e # TODO maybe use gmpy2 for this
+        self.dummy_message = powmod(2, e, N)
         self.I = None # the current subset
         self.I_prime = None # the complement of the current subset
         self.subsets = [] # this is a history of all subsets that this computer has been part of
         self.presigning_data = {} # maps subset -> this computer's presigning data for that subset
+
+        # Variables for share generation/verification/combining
+        self.sigmas = [] # contains tuples of the form (id, signature share)
+                         # there should be k items in self.sigmas
+
+        self.signature = None # the final signature produced after combining k shares
+
 
     '''
     Change this computer's vote to be yes or no (set agree to True or False)
@@ -197,16 +207,16 @@ class Computer:
             if computer.id == self.id:
                 continue
             lambda_t_i *= (computer.id + 1)/(computer.id - self.id) # We need the "+1" because otherwise we could get 0
-            lambda_t_i %= M
+            lambda_t_i = mod(lambda_t_i, M)
         self.presigning_data[self.I].lambda_t_i = lambda_t_i
 
-        # Compute s_t_i
+        # Compute s_t_i = (sum(f_i_j) * lambda_t_i) % M
         I_prime_ids = map(lambda computer: computer.id, self.I_prime)
-        s_t_i = (sum([self.f_i_j[i] for i in I_prime_ids]) * lambda_t_i) % M
+        s_t_i = multiply(sum([self.f_i_j[i] for i in I_prime_ids]), lambda_t_i) % M
         self.presigning_data[self.I].s_t_i = s_t_i
 
         # Compute h_t_i
-        h_t_i = (g**(s_t_i)) % N # TODO maybe use gmpy2 for this
+        h_t_i = powmod(g, s_t_i, N)
         self.presigning_data[self.I].h_t_i = h_t_i
 
         # Broadcast h_t_i so other computers can use it to verify later,
@@ -247,19 +257,19 @@ class Computer:
         # Find x_I by checking all possible values
         possible_x_I = range(k-n, k+1) # x_I can be between k-n and k inclusive.
         # Calculate the product of the received signature shares.
-        product_c_prime_t_i = (reduce(lambda x,y: x*y,
+        product_c_prime_t_i = mod(reduce(multiply,
             map(lambda sigma: sigma[0],
-                self.presigning_data[self.I].received_sigma_I_t_i))) % N
-        # Calculate 2^(e*M)
-        two_e_M = (2 ** (e*M)) % N
+                self.presigning_data[self.I].received_sigma_I_t_i)), N)
+        # Calculate 2^(e*M) % N
+        two_e_M = powmod(2, multiply(e, M), N)
         # Search for the value of x_I that makes the product = 2 * (2^(e*M*x_I))
         x_I = None
         for x in possible_x_I:
-            if product_c_prime_t_i == (2 * (two_e_M)**(x)):
+            if product_c_prime_t_i == multiply(2, powmod(two_e_M, x, N)) :
                 x_I = x
                 break
         if x_I is None:
-            x_I = 0 # random number for testing
+            x_I = 6 # random number for testing
             # raise RuntimeError("Couldn't find viable x_I in subset presigning algorithm, computer " + str(self.id))
         self.presigning_data[self.I].x_I = x_I
 
@@ -293,6 +303,7 @@ class Computer:
             for id_h, h_t_i in self.presigning_data[self.I].received_h_t_i:
                 if id_s == id_h:
                     h_sigma_array.append((id_s, h_t_i, sigma[0]))
+                    break
         # Make sure that we got k tuples after matching, otherwise there are unmatched values.
         if len(h_sigma_array) != k:
             raise RuntimeError("Couldn't match h_t_i and sigma values appropriately.")

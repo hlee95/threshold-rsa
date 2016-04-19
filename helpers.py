@@ -1,6 +1,10 @@
 import random
 import gmpy2
 
+########################
+# General Math Helpers
+########################
+
 '''
 Returns a random prime number in the range [start, end)
 '''
@@ -9,6 +13,32 @@ def get_random_prime(start,end):
     while not gmpy2.is_prime(i):
         i +=1
     return i
+
+'''
+Returns (x^y) mod m
+'''
+def powmod(x, y, m):
+    return gmpy2.powmod(gmpy2.mpz(x), gmpy2.mpz(y), gmpy2.mpz(m))
+
+'''
+Multiply x * y
+'''
+def multiply(x, y):
+    return gmpy2.mul(gmpy2.mpz(x), gmpy2.mpz(y))
+
+'''
+Calcaulte x mod m
+'''
+def mod(x, m):
+    remainder = gmpy2.t_mod(gmpy2.mpz(x), gmpy2.mpz(m))
+    # gmpy2.t_mod can return negative values, but we want positive ones.
+    if remainder < 0:
+        remainder = gmpy2.add(remainder, m)
+    return remainder
+
+#########################################
+# Subset Presigning Algorithm Helpers
+#########################################
 
 '''
 Helper class (basically a struct) that stores the data that

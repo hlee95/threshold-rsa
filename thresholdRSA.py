@@ -57,7 +57,7 @@ class Network:
             user.dealing_phase_1(M,k,g,S)
         for user if S:
             #verfication phase
-            if not user.dealing_phase_2():
+            if not user.dealing_phase_2(M,k,g,S):
                 print "aborted, somone lied"
                 return False
         return True
@@ -143,6 +143,10 @@ class Computer:
         # the array for the commitments of of the coefficients of the polynomial
         # we get them from all other users, thus the n by n array
         self.b_i_j = [[0]*n for i in xrange(n)]
+        # Variables set at the end of the dealing algorythm
+        self.S = {} #{k,M,g}
+        self.P_i = [] # {{b_j,l}_j=1,...,n,l=0,...,k-1}
+        self.S_i = {} # #{d_i,{a_i,j}_j=1,...,k-1,{f_j,i}_i!=j}
         # Variables for the subset presigning algorithm
         self.dummy_message = powmod(2, e, N)
         self.I = None # the current subset
@@ -187,9 +191,10 @@ class Computer:
         # pick the random polynomial
         self.a_i_j = [0]*k
         rand_state = gmpy2.random_state()
-        for i in xrange(k):
+        for i in xrange(1,k):
             self.a_i_j[i] = gmpy2.mpz_random(M)
         # calculate f_i_j for each other user and set their values
+        # f_i_j = f_i(j)
         for user in S:
             if user != self:
                 f_i_j = 0
@@ -197,8 +202,30 @@ class Computer:
                     f_i_j+=a_i_j[k-1]*pow(user._id**,i,M)
                 f_i_j+=self.d_i
                 user.f_i_j[self._id]=f_i_j
-                for j in xrange(k):
-                    user.b_i_j[self._id][j]=pow(g,a_i_j[j],N)
+        for user in S:
+            for j in xrange(k):
+                user.b_i_j[self._id][j]=pow(g,a_i_j[j],N)
+
+    def dealing_phase_2(self,M,k,g,S):
+        # check to ensure people sent out the correct values
+        for user_i in S:
+            if user_i != self:
+                g_exp_f_i_j = pow(g,self.f_i_j[user._id],N)
+                checker = 1
+                for t in xrange(k):
+                    checker*=pow(b_i_j[user._id][t],pow(self._id,t,N),N)
+                if checker != g_exp_f_i_j:
+                    return False
+        # set the final values
+        self.S["k"] = k
+        self.S["M"] = M
+        self.S["g"] = g
+        self.P_i = self.b_i_j # check this again
+        self.S_i["d_i"]=self.d_i
+        self.S_i["a_i,j"]=self.a_i_j[1:] # we don't want the term a_0
+        self.S_i["f_j,i"]=self.f_i_j # there is a 0 where self is for indexing purposes
+        return True
+        
         
 
     #####################################################

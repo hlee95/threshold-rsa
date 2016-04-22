@@ -39,6 +39,31 @@ class Network:
         # then, run the dealing algorithm
         pass
 
+    """
+    the dealing algorythm.
+    each user with their share of the private key d_i
+    the users agree on a k and global public S
+    Each player gets Public Private share pair (P_i,S_i)
+    which is needed to implement the signiture scheme
+    takes paramters
+    prime M > N
+    threshold k
+    element g of high order Z_n
+    S the set of all users
+    """
+    def dealing_Algorythm(M,k,g,S):
+        for user if S:
+            #calculation phase
+            user.dealing_phase_1(M,k,g,S)
+        for user if S:
+            #verfication phase
+            if not user.dealing_phase_2():
+                print "aborted, somone lied"
+                return False
+        return True
+                
+        
+
     '''
     Produce a valid signature for the given message if at least k parties agree.
     '''
@@ -103,6 +128,7 @@ class Network:
         for t_i in I:
             t_i.subset_presigning_algorithm_phase_4()
 
+
 class Computer:
     def __init__(self, _id, agree):
         self.id = _id
@@ -113,7 +139,10 @@ class Computer:
 
         # Variables for the dealing algorithm
         self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
-
+        self.a_i_j = []
+        # the array for the commitments of of the coefficients of the polynomial
+        # we get them from all other users, thus the n by n array
+        self.b_i_j = [[0]*n for i in xrange(n)]
         # Variables for the subset presigning algorithm
         self.dummy_message = powmod(2, e, N)
         self.I = None # the current subset
@@ -154,7 +183,23 @@ class Computer:
     # at this point each party j has recieved f_{1,j},...,f_{n,j} and verifies
     # # # g^{f_{i,j}} = g^{f_i(j)} mod N = g^{a_{1,k-1}j^{k-1}+...+a_{i,1}j+d_i}
     # # #             =
-
+    def dealing_phase_1(self,M,k,g,S):
+        # pick the random polynomial
+        self.a_i_j = [0]*k
+        rand_state = gmpy2.random_state()
+        for i in xrange(k):
+            self.a_i_j[i] = gmpy2.mpz_random(M)
+        # calculate f_i_j for each other user and set their values
+        for user in S:
+            if user != self:
+                f_i_j = 0
+                for i in xrange(k-1,0,-1):
+                    f_i_j+=a_i_j[k-1]*pow(user._id**,i,M)
+                f_i_j+=self.d_i
+                user.f_i_j[self._id]=f_i_j
+                for j in xrange(k):
+                    user.b_i_j[self._id][j]=pow(g,a_i_j[j],N)
+        
 
     #####################################################
     # Stuff for the Subset Presigning Algorithm (6.2.2)

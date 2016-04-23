@@ -1,6 +1,7 @@
 import random
 import gmpy2
 
+
 ########################
 # General Math Helpers
 ########################
@@ -18,7 +19,7 @@ def get_random_prime(start,end):
 Returns a random integer between 0 and n-1.
 '''
 def get_random_int(n):
-    return gmpy2.mpz_random(gmpy2.random_state(), n)
+    return gmpy2.mpz_random(gmpy2.random_state(random.randint(0,100)), n)
 
 '''
 Returns (x^y) mod m

@@ -15,9 +15,10 @@ e = 1 # TODO compute this
 # for now lets just make the the product of 2 large random primes
 bits_secure = 1024
 N = get_random_prime(2**bits_secure,2**(bits_secure+1)-1)*get_random_prime(2**bits_secure,2**(bits_secure+1)-1)
-
+#print "N=",N
 # M = A prime number where M > N
 M = get_random_prime(N,2*N)
+#print "M=",M
 
 class Network:
     def __init__(self, sayingYes = []):
@@ -41,7 +42,8 @@ class Network:
         # TODO ^
 
         # then, run the dealing algorithm
-        self.dealing_algorithm(M, k, g, self.nodes)
+        #self.dealing_algorithm(M, k, g, self.nodes)
+        pass
 
     """
     the dealing algorithm.
@@ -52,17 +54,18 @@ class Network:
     takes paramters
     prime M > N
     threshold k
-    element g of high order Z_n
+    element g of high order Z_N
     S the set of all users
     """
-    def dealing_algorithm(self, M,k,g,S):
-        for user in S:
+    def dealing_algorithm(self):
+        for user in self.nodes:
             #calculation phase
-            user.dealing_phase_1(M,k,g,S)
-        for user in S:
+            user.dealing_phase_1(M,k,g,self.nodes)
+        for user in self.nodes:
+            #print "user id = ",user.id+1
             #verfication phase
-            if not user.dealing_phase_2(M,k,g,S):
-                print "aborted, someone lied"
+            if not user.dealing_phase_2(M,k,g,self.nodes):
+                print "aborted, user",user.id+1,", found an error"
                 return False
         return True
 
@@ -192,32 +195,51 @@ class Computer:
     # # # g^{f_{i,j}} = g^{f_i(j)} mod N = g^{a_{1,k-1}j^{k-1}+...+a_{i,1}j+d_i}
     # # #             =
     def dealing_phase_1(self,M,k,g,S):
+        #print "user",self.id+1
+        selfid = self.id+1
         # pick the random polynomial
         self.a_i_j = [0]*k
-        rand_state = gmpy2.random_state()
+        self.a_i_j[0] = self.d_i
         for i in xrange(1,k):
             self.a_i_j[i] = get_random_int(M)
+        #print "a_i_j",self.a_i_j
         # calculate f_i_j for each other user and set their values
         # f_i_j = f_i(j)
-        for user in S:
-            if user != self:
+        for user in S: # for user in set
+            if user != self: # those that are not you
+                userid = user.id+1
                 f_i_j = 0
-                for i in xrange(k-1,0,-1):
-                    f_i_j+=self.a_i_j[k-1]*powmod(user.id,i,M)
-                f_i_j+=self.d_i
-                user.f_i_j[self.id]=f_i_j
+                for c in xrange(k-1,-1,-1):
+                    f_i_j+=multiply(self.a_i_j[c],powmod(userid,c,M))
+                #print "f_i_j for user",userid,"is",f_i_j#%M
+                user.f_i_j[self.id]=f_i_j#%M
         for user in S:
-            for j in xrange(k):
+            for j in xrange(0,k):
                 user.b_i_j[self.id][j]=powmod(g,self.a_i_j[j],N)
+            #print "the bs for user",user.id+1,"is",user.b_i_j[self.id]
 
     def dealing_phase_2(self,M,k,g,S):
         # check to ensure people sent out the correct values
+        selfid = self.id+1
         for user_i in S:
             if user_i != self:
+                user_iid = user_i.id+1
+                #print "checking user ",user_iid
+                #print "f_i_j user",user_i.id,self.f_i_j[user_i.id]
+                #print "g=",g,"self.f_i_j[user_i.id]=",self.f_i_j[user_i.id],"N=",N
                 g_exp_f_i_j = powmod(g,self.f_i_j[user_i.id],N)
-                checker = 1
+                #print self.f_i_j[user_i.id]
+                checker = gmpy2.mpz(1)
                 for t in xrange(k):
-                    checker*=powmod(self.b_i_j[user_i.id][t],powmod(self.id,t,N),N)
+                    #print "b_i_j[t] t = ",t,self.b_i_j[user_i.id][t]
+                    #print "new multiplicand to checker = ",powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N)
+                    checker=multiply(checker,powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N))
+                    #print "powmod(selfid,t,N)",powmod(selfid,t,N)
+                    #print powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N)
+                checker = mod(checker,N)
+                #print "checker",checker
+                #print "g^f_i_j",g_exp_f_i_j
+                #print 
                 if checker != g_exp_f_i_j:
                     return False
         # set the final values

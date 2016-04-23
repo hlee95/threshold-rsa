@@ -8,6 +8,14 @@ from thresholdRSA import *
 # To run tests, just do ./tests.py in the working directory.
 ##############################################################
 
+
+def brian_dealing_tests():
+    network = Network()
+    M = get_random_prime(N+1,2*N)
+    print network.dealing_algorithm()
+brian_dealing_tests()
+    
+
 # Just observe the output and make sure it's right.
 # (Expect to fail, then [0, 1, 2, 5], then fail, then [0, 1, 2, 6], then fail.)
 def hanna_subset_presigning_test():
@@ -38,6 +46,6 @@ def run_all_tests():
     print "---------------------------------------"
 
 # Run everything!
-run_all_tests()
+#run_all_tests()
 
 

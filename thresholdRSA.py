@@ -395,7 +395,7 @@ class Computer:
             raise RuntimeError("Didn't receive k sigmas or h_t_i values.")
         # Match them up and aggregate into h_sigma_array
         for id_s, sigma in self.sigmas:
-            for id_h, h_t_i in self.presigning_data[self.I].received_h_t_i:
+            for id_h, h_t_i in self.presigning_data[self.I].received_h_t_i.items():
                 if id_s == id_h:
                     h_sigma_array.append((id_s, h_t_i, sigma[0]))
                     break

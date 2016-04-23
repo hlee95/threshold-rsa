@@ -15,11 +15,18 @@ def get_random_prime(start,end):
         i +=1
     return i
 
+def get_random_safe_prime(start,end):
+    i = random.randint(start,end) # better random nunber generator
+    while not (gmpy2.is_prime(i) and gmpy2.is_prime(gmpy2.t_div((i-1),2))):
+        i +=1
+    return i
+
 '''
 Returns a random integer between 0 and n-1.
 '''
 def get_random_int(n):
-    return gmpy2.mpz_random(gmpy2.random_state(random.randint(0,100)), n)
+    i = random.randint(0,2**30) # better random nunber generator
+    return gmpy2.mpz_random(gmpy2.random_state(i), n)
 
 '''
 Returns (x^y) mod m
@@ -33,6 +40,20 @@ Multiply x * y
 def multiply(x, y):
     return gmpy2.mul(gmpy2.mpz(x), gmpy2.mpz(y))
 
+
+'''
+Divide x / y
+'''
+def divide(x, y):
+    return gmpy2.t_div(gmpy2.mpz(x), gmpy2.mpz(y))
+
+'''
+Subtract x - y
+'''
+def subtract(x, y):
+    return gmpy2.sub(gmpy2.mpz(x), gmpy2.mpz(y))
+
+
 '''
 Calcaulte x mod m
 '''
@@ -42,6 +63,19 @@ def mod(x, m):
     if remainder < 0:
         remainder = gmpy2.add(remainder, m)
     return remainder
+
+#[d_1, d_2...d_n] such that sum [] = d
+def d_i_creator(d, n):
+    d_i = []
+    #choose random values for first n-1
+    for i in range(n-1):
+        d_i.append(get_random_int(divide(d, 10)))
+        
+    #last one must make sum to d    
+    for i in d_i:
+        d = subtract(d, i)
+    d_i.append(d)
+    return d_i
 
 #########################################
 # Subset Presigning Algorithm Helpers

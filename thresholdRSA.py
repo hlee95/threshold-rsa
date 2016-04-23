@@ -8,6 +8,10 @@ n = 10
 k = 4
 # g is an agreed upon element in Z*_n that has high order
 g = 101 # TODO compute this
+# e = the public key
+e = 1 # TODO compute this
+# B1 is the bound used in 5.2.1 distributed sieving method, TODO not exactly sure how to compute
+B1 = 2 << 10
 
 # N = public modulus
 # for now lets just make the the product of 2 large random primes
@@ -46,10 +50,25 @@ class Network:
     def setup(self):
         # first, choose N and e, and distribute d_i to everyone
         # TODO ^
+        self.generate_and_verify_N() # generate public RSA modulus N and verify it's the product of two primes
+        self.choose_e() # choose the public encryption key e
 
         # then, run the dealing algorithm
         self.dealing_algorithm()
-        pass
+
+    '''
+    Generate N, and verify that it is the product of two primes.
+    At the end of this function, every computer will know N,
+    '''
+    def generate_and_verify_N(self):
+        M = reduce(multiply, get_primes_in_range(n, B1)) # local M not global M
+            # this M is the product of all primes in the range (n, B1]
+
+        for computer in self.nodes:
+            computer.generate_N(M)
+
+        for computer in self.nodes:
+            pass # TODO call Brian's code that will verify self.N, and if necessary, generate_N again.
 
     """
     the dealing algorithm.
@@ -74,8 +93,6 @@ class Network:
                 print "aborted, user",user.id+1,", found an error"
                 return False
         return True
-
-
 
     '''
     Produce a valid signature for the given message if at least k parties agree.
@@ -141,14 +158,23 @@ class Network:
         for t_i in I:
             t_i.subset_presigning_algorithm_phase_4()
 
-
 class Computer:
-    def __init__(self, _id, agree, d_i):
+    def __init__(self, _id, agree):
         self.id = _id
         self.agree = agree
 
         # This computer's share of the secret key
-        self.d_i = d_i
+        self.d_i = 0
+
+        # Variables for RSA secret keys and modulus
+        self.N = None # the shared public modulus for RSA
+        self.e = None # the RSA public key
+        self.p_i = None # this computer's share of prime p
+        self.q_i = None # this computer's share of prime q
+        self.d_i = 0 # this computer's share of the secret key d
+        # Intermediate variables needed to generate RSA modulus and secret key shares
+        self.bgw = None # data for running BGW protocol; the data is replaced every time we run the protocol
+        self.pq = None # data to store intermediate values
 
         # Variables for the dealing algorithm
         self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
@@ -160,6 +186,7 @@ class Computer:
         self.S = {} #{k,M,g}
         self.P_i = [] # {{b_j,l}_j=1,...,n,l=0,...,k-1}
         self.S_i = {} # #{d_i,{a_i,j}_j=1,...,k-1,{f_j,i}_i!=j}
+
         # Variables for the subset presigning algorithm
         self.dummy_message = powmod(2, e, N)
         self.I = None # the current subset
@@ -180,6 +207,21 @@ class Computer:
     '''
     def change_choice(self, agree):
         self.agree = agree
+
+
+    #####################################################
+    # Stuff for Deciding N, e, d_i, g
+    #####################################################
+    '''
+    Protocol among the computers for generating the public RSA modulus N.
+    All arithmetic when calculating N should be done modulo M.
+    '''
+    def generate_N(self, M):
+        self.pq = PQData(M)
+        self.pq.a_i = get_relatively_prime_int(M) # Let a_i be some random integer
+
+        # TODO finish
+
 
     #####################################################
     # Stuff for the Dealing Algorithm (6.2.1)
@@ -245,7 +287,7 @@ class Computer:
                 checker = mod(checker,N)
                 #print "checker",checker
                 #print "g^f_i_j",g_exp_f_i_j
-                #print 
+                #print
                 if checker != g_exp_f_i_j:
                     return False
         # set the final values
@@ -343,7 +385,7 @@ class Computer:
         s_t_i = multiply(sum([self.f_i_j[i] for i in I_prime_ids]), lambda_t_i) % M
         self.presigning_data[self.I].s_t_i = s_t_i
         self.presigning_data[self.I].S_I_t_i = s_t_i
-        
+
         # Compute h_t_i
         h_t_i = powmod(g, s_t_i, N)
         self.presigning_data[self.I].h_t_i = h_t_i
@@ -368,7 +410,7 @@ class Computer:
     def subset_presigning_algorithm_phase_3(self):
         # Check that we received a signature share from all k-1 other computers in the group.
         if len(self.sigmas) != k:
-            # 
+            #
             "Didn't receive signature share on dummy message from k-1 other parties."
             raise RuntimeError("Didn't receive signature share on dummy message from k-1 other parties.")
 
@@ -435,7 +477,7 @@ class Computer:
             raise RuntimeError("Couldn't match h_t_i and sigma values appropriately.")
 
         self.presigning_data[self.I].D_I = (self.presigning_data[self.I].x_I, h_sigma_array)
-        
+
         print 'S_I_t_i', self.presigning_data[self.I].S_I_t_i
         print 'I', self.I
 
@@ -522,4 +564,3 @@ class Computer:
             phi_i = N +phi_i + i
         #step 2
         psi_i = phi_i
-            

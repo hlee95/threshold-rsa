@@ -56,7 +56,7 @@ class PresigningData:
         self.lamdba_t_i = None
         self.s_t_i = None
         self.h_t_i = None
-        self.received_h_t_i = [] # contains tuples with the (id, h_t_i) of all k computers
+        self.received_h_t_i = {} # maps id -> h_t_i for all k computers
 
         self.sigma_I_t_i = None # signature on the dummy message
         self.x_I = None

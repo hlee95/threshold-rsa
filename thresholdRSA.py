@@ -259,7 +259,7 @@ class Computer:
     and the computer's id, as a tuple.
     '''
     def receive_presigning_h_t_i(self, id_and_h_t_i):
-        self.presigning_data[self.I].received_h_t_i.append(id_and_h_t_i)
+        self.presigning_data[self.I].received_h_t_i[id_and_h_t_i[0]] = id_and_h_t_i[1]
 
     '''
     Receive a broadcast of a different computer's calculated x_I

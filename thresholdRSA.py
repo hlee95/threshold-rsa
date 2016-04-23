@@ -8,13 +8,18 @@ n = 10
 k = 4
 # g is an agreed upon element in Z*_n that has high order
 g = 101 # TODO compute this
-# e = the public key
-e = 1 # TODO compute this
 
 # N = public modulus
 # for now lets just make the the product of 2 large random primes
 bits_secure = 1024
 N = get_random_prime(2**bits_secure,2**(bits_secure+1)-1)*get_random_prime(2**bits_secure,2**(bits_secure+1)-1)
+
+#N = get_random_safe_prime(2**bits_secure,2**(bits_secure+1)-1)*get_random_prime(2**bits_secure,2**(bits_secure+1)-1)
+# e = the public key
+e = get_random_int(N)# TODO compute this
+d = powmod(e, -1, N)
+#creating d_is, delete later
+d_i = d_i_creator(d, n)
 
 # M = A prime number where M > N
 M = get_random_prime(N,2*N)
@@ -24,9 +29,9 @@ class Network:
         self.nodes = []
         for i in range(n):
             if i in sayingYes:
-                self.nodes.append(Computer(i, True))
+                self.nodes.append(Computer(i, True, d_i[i]))
             else:
-                self.nodes.append(Computer(i, False))
+                self.nodes.append(Computer(i, False, d_i[i]))
         self.setup()
 
     def get_nodes(self):
@@ -134,12 +139,12 @@ class Network:
 
 
 class Computer:
-    def __init__(self, _id, agree):
+    def __init__(self, _id, agree, d_i):
         self.id = _id
         self.agree = agree
 
         # This computer's share of the secret key
-        self.d_i = 0
+        self.d_i = d_i
 
         # Variables for the dealing algorithm
         self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
@@ -314,7 +319,8 @@ class Computer:
         I_prime_ids = map(lambda computer: computer.id, self.I_prime)
         s_t_i = multiply(sum([self.f_i_j[i] for i in I_prime_ids]), lambda_t_i) % M
         self.presigning_data[self.I].s_t_i = s_t_i
-
+        self.presigning_data[self.I].S_I_t_i = s_t_i
+        
         # Compute h_t_i
         h_t_i = powmod(g, s_t_i, N)
         self.presigning_data[self.I].h_t_i = h_t_i
@@ -339,7 +345,8 @@ class Computer:
     def subset_presigning_algorithm_phase_3(self):
         # Check that we received a signature share from all k-1 other computers in the group.
         if len(self.sigmas) != k:
-            # print "Didn't receive signature share on dummy message from k-1 other parties."
+            # 
+            "Didn't receive signature share on dummy message from k-1 other parties."
             raise RuntimeError("Didn't receive signature share on dummy message from k-1 other parties.")
 
         # Verify each signature share.
@@ -378,6 +385,7 @@ class Computer:
     and then setting D_I and S_I_t_i for this subset.
     '''
     def subset_presigning_algorithm_phase_4(self):
+        print 'PHASE 4'
         # Verify all received x_I (check that they are the same as what we found).
         if len(self.presigning_data[self.I].received_x_I) != k-1:
             raise RuntimeError("Didn't receive enough x_I values in subset presigning.")
@@ -404,6 +412,9 @@ class Computer:
             raise RuntimeError("Couldn't match h_t_i and sigma values appropriately.")
 
         self.presigning_data[self.I].D_I = (self.presigning_data[self.I].x_I, h_sigma_array)
+        
+        print 'S_I_t_i', self.presigning_data[self.I].S_I_t_i
+        print 'I', self.I
 
     ###############################################################
     # Stuff for the Signature Share Generation and Verification
@@ -424,8 +435,30 @@ class Computer:
     Also returns the signature share.
     '''
     def signature_share_generation(self, m):
-        sigma = (1, None) #TODO: actually calculate sigma = (signature, proof)
-
+        #needs to be fixed for unknown order of g mod N
+        d_i = self.d_i
+        s_i = self.presigning_data[self.I].S_I_t_i
+        b_ti0 = self.b_i_j[self.id][0]
+        h_ti = self.presigning_data[self.I].h_t_i
+        print 'd_i',d_i
+        print 's_i', s_i
+        print 'b_ti0',b_ti0
+        print 'h_ti', h_ti
+        print 'g', g
+        c_i = powmod(m, s_i+d_i, N)
+        s = get_random_int(N)
+        c = get_random_int(N)
+        r= s+c*(s_i+d_i)
+        m_s = powmod(m, s, N)
+        g_s = powmod(g, s, N)
+        proof = [m, (g_s, m_s), r, c] #
+        sigma = (m, proof) #TODO: actually calculate sigma = (signature, proof)
+        #print powmod(g, r, N)
+        #print g_s*powmod(b_ti0*h_ti, c, N)
+        #print powmod(m, r, N)
+        #print m_s*powmod(c_i, c, N)
+        print mod(b_ti0*h_ti,N)
+        print powmod(g, s_i+d_i, N)
         # TODO broadcast the tuple (self.id, sigma) to other parties
         for computer in self.I:
             computer.receive_sigma((self.id, sigma))

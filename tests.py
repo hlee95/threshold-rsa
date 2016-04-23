@@ -24,10 +24,10 @@ def hanna_subset_presigning_test():
     network.nodes[8].change_choice(True)
     network.sign(300)
     print "\nRemove one person."
-    network.nodes[2].change_choice(False)
+    network.nodes[5].change_choice(False)
     network.sign(400)
     print "\nAdd back in the removed person."
-    network.nodes[2].change_choice(True)
+    network.nodes[5].change_choice(True)
     network.sign(500)
 
 def run_all_tests():

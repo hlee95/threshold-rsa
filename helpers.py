@@ -15,6 +15,12 @@ def get_random_prime(start,end):
     return i
 
 '''
+Returns a random integer between 0 and n-1.
+'''
+def get_random_int(n):
+    return gmpy2.mpz_random(gmpy2.random_state(), n)
+
+'''
 Returns (x^y) mod m
 '''
 def powmod(x, y, m):

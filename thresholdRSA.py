@@ -27,6 +27,8 @@ class Network:
                 self.nodes.append(Computer(i, True))
             else:
                 self.nodes.append(Computer(i, False))
+        self.setup()
+
     def get_nodes(self):
         return self.nodes
 
@@ -36,33 +38,35 @@ class Network:
     '''
     def setup(self):
         # first, choose N and e, and distribute d_i to everyone
+        # TODO ^
+
         # then, run the dealing algorithm
-        pass
+        self.dealing_algorithm(M, k, g, self.nodes)
 
     """
-    the dealing algorythm.
+    the dealing algorithm.
     each user with their share of the private key d_i
     the users agree on a k and global public S
     Each player gets Public Private share pair (P_i,S_i)
-    which is needed to implement the signiture scheme
+    which is needed to implement the signature scheme
     takes paramters
     prime M > N
     threshold k
     element g of high order Z_n
     S the set of all users
     """
-    def dealing_Algorythm(M,k,g,S):
-        for user if S:
+    def dealing_algorithm(self, M,k,g,S):
+        for user in S:
             #calculation phase
             user.dealing_phase_1(M,k,g,S)
-        for user if S:
+        for user in S:
             #verfication phase
             if not user.dealing_phase_2(M,k,g,S):
-                print "aborted, somone lied"
+                print "aborted, someone lied"
                 return False
         return True
-                
-        
+
+
 
     '''
     Produce a valid signature for the given message if at least k parties agree.
@@ -143,7 +147,7 @@ class Computer:
         # the array for the commitments of of the coefficients of the polynomial
         # we get them from all other users, thus the n by n array
         self.b_i_j = [[0]*n for i in xrange(n)]
-        # Variables set at the end of the dealing algorythm
+        # Variables set at the end of the dealing algorithm
         self.S = {} #{k,M,g}
         self.P_i = [] # {{b_j,l}_j=1,...,n,l=0,...,k-1}
         self.S_i = {} # #{d_i,{a_i,j}_j=1,...,k-1,{f_j,i}_i!=j}
@@ -169,11 +173,11 @@ class Computer:
         self.agree = agree
 
     #####################################################
-    # Stuff for the Dealign Algorithm (6.2.1)
+    # Stuff for the Dealing Algorithm (6.2.1)
     #####################################################
 
     # dealing algorithm (6.2.1)
-    # Parties i=1...n agreeon the following paramters
+    # Parties i=1...n agree on the following paramters
     # # # prime M > N
     # # # threshold k where 1 < k < n
     # # # element g of high order Z_N*
@@ -182,7 +186,7 @@ class Computer:
     # ith party computes f_i(j) and send to party P_j for all j=1..n
     # note this is the Shamir sharing of d_i
     # ith party also computes b_{i,j}=g^{a_{i,j}} mod N for j = 0...(k-1)
-    # # # broadcats these values
+    # # # broadcasts these values
     # # # these are the commitments
     # at this point each party j has recieved f_{1,j},...,f_{n,j} and verifies
     # # # g^{f_{i,j}} = g^{f_i(j)} mod N = g^{a_{1,k-1}j^{k-1}+...+a_{i,1}j+d_i}
@@ -192,28 +196,28 @@ class Computer:
         self.a_i_j = [0]*k
         rand_state = gmpy2.random_state()
         for i in xrange(1,k):
-            self.a_i_j[i] = gmpy2.mpz_random(M)
+            self.a_i_j[i] = get_random_int(M)
         # calculate f_i_j for each other user and set their values
         # f_i_j = f_i(j)
         for user in S:
             if user != self:
                 f_i_j = 0
                 for i in xrange(k-1,0,-1):
-                    f_i_j+=a_i_j[k-1]*pow(user._id**,i,M)
+                    f_i_j+=self.a_i_j[k-1]*powmod(user.id,i,M)
                 f_i_j+=self.d_i
-                user.f_i_j[self._id]=f_i_j
+                user.f_i_j[self.id]=f_i_j
         for user in S:
             for j in xrange(k):
-                user.b_i_j[self._id][j]=pow(g,a_i_j[j],N)
+                user.b_i_j[self.id][j]=powmod(g,self.a_i_j[j],N)
 
     def dealing_phase_2(self,M,k,g,S):
         # check to ensure people sent out the correct values
         for user_i in S:
             if user_i != self:
-                g_exp_f_i_j = pow(g,self.f_i_j[user._id],N)
+                g_exp_f_i_j = powmod(g,self.f_i_j[user_i.id],N)
                 checker = 1
                 for t in xrange(k):
-                    checker*=pow(b_i_j[user._id][t],pow(self._id,t,N),N)
+                    checker*=powmod(self.b_i_j[user_i.id][t],powmod(self.id,t,N),N)
                 if checker != g_exp_f_i_j:
                     return False
         # set the final values
@@ -225,8 +229,8 @@ class Computer:
         self.S_i["a_i,j"]=self.a_i_j[1:] # we don't want the term a_0
         self.S_i["f_j,i"]=self.f_i_j # there is a 0 where self is for indexing purposes
         return True
-        
-        
+
+
 
     #####################################################
     # Stuff for the Subset Presigning Algorithm (6.2.2)

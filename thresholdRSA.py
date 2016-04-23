@@ -48,7 +48,7 @@ class Network:
         # TODO ^
 
         # then, run the dealing algorithm
-        #self.dealing_algorithm(M, k, g, self.nodes)
+        self.dealing_algorithm()
         pass
 
     """
@@ -463,25 +463,15 @@ class Computer:
         s_i = self.presigning_data[self.I].S_I_t_i
         b_ti0 = self.b_i_j[self.id][0]
         h_ti = self.presigning_data[self.I].h_t_i
-        print 'd_i',d_i
-        print 's_i', s_i
-        print 'b_ti0',b_ti0
-        print 'h_ti', h_ti
-        print 'g', g
         c_i = powmod(m, s_i+d_i, N)
         s = get_random_int(N)
         c = get_random_int(N)
         r= s+c*(s_i+d_i)
         m_s = powmod(m, s, N)
         g_s = powmod(g, s, N)
-        proof = [m, (g_s, m_s), r, c] #
+        proof = [(g_s, m_s), c_i, r, c] #
         sigma = (m, proof) #TODO: actually calculate sigma = (signature, proof)
-        #print powmod(g, r, N)
-        #print g_s*powmod(b_ti0*h_ti, c, N)
-        #print powmod(m, r, N)
-        #print m_s*powmod(c_i, c, N)
-        print mod(b_ti0*h_ti,N)
-        print powmod(g, s_i+d_i, N)
+
         # TODO broadcast the tuple (self.id, sigma) to other parties
         for computer in self.I:
             computer.receive_sigma((self.id, sigma))
@@ -493,8 +483,16 @@ class Computer:
     verify that the proof holds, and return True or False.
     '''
     def signature_share_verification(self):
-        for sigma in self.sigmas:
-            pass
+        print 'verifying'
+        for (s_id, sigma) in self.sigmas:
+            (m, proof) = sigma
+            [(g_s, m_s), c_i, r, c] = proof
+            b_ti0 = self.b_i_j[s_id][0]
+            h_ti = self.presigning_data[self.I].received_h_t_i[s_id]
+            if powmod(g, r, N) != mod(g_s*powmod(b_ti0*h_ti, c, N), N):
+                return False
+            if powmod(m, r, N) != mod(m_s*powmod(c_i, c, N), N):
+                return False
         return True # TODO actually verify each sigma
 
     ##############################################
@@ -516,3 +514,12 @@ class Computer:
         # Calculate the final signature = m^(-x_I * M) * the product
         self.signature = mod(multiply(product_c_t_i, powmod(m, -1 * multiply(self.presigning_data[self.I].x_I, M), N)), N)
 
+
+    def private_key_generation():
+        #step 1
+        phi_i =-(self.pi+self.qi)
+        if self.id == 1:
+            phi_i = N +phi_i + i
+        #step 2
+        psi_i = phi_i
+            

@@ -13,7 +13,6 @@ def brian_dealing_tests():
     network = Network()
     M = get_random_prime(N+1,2*N)
     print network.dealing_algorithm()
-brian_dealing_tests()
     
 
 # Just observe the output and make sure it's right.
@@ -66,12 +65,12 @@ def hao_signing_test():
 def run_all_tests():
     #hanna_subset_presigning_test()
     hao_signing_test()
-
+    brian_dealing_tests()
     print "---------------------------------------"
     print "DONE WITH TESTS"
     print "---------------------------------------"
 
 # Run everything!
-#run_all_tests()
+run_all_tests()
 
 

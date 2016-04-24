@@ -13,7 +13,6 @@ def brian_dealing_tests():
     network = Network()
     M = get_random_prime(N+1,2*N)
     print network.dealing_algorithm()
-brian_dealing_tests()
     
 
 # Just observe the output and make sure it's right.
@@ -37,15 +36,41 @@ def hanna_subset_presigning_test():
     print "\nAdd back in the removed person."
     network.nodes[5].change_choice(True)
     network.sign(500)
+    
+def hao_signing_test():
+    print "---------------------------------------"
+    print "SUBSET PRESIGNING TEST"
+    print "---------------------------------------"
+    network = Network(range(4, 7))
+    print "Try with 3 people."
+    network.sign(100)
+    print "\nTry with 4 people."
+    network.nodes[2].change_choice(True)
+    network.sign(200)
+    print "\nTry with same 4 people."
+    network.nodes[8].change_choice(True)
+    network.sign(300)
+    print "\nRemove one person."
+    network.nodes[5].change_choice(False)
+    network.sign(400)
+    print "\nAdd back in the removed person."
+    network.nodes[5].change_choice(True)
+    network.sign(500)
+    
+    print "\n signature share generation"
+    network.nodes[2].signature_share_generation(13223)
+    print "\n signature share generation"
+    network.nodes[5].signature_share_generation(523508)
 
 def run_all_tests():
-    hanna_subset_presigning_test()
-
+    #hanna_subset_presigning_test()
+    hao_signing_test()
+    brian_dealing_tests()
     print "---------------------------------------"
     print "DONE WITH TESTS"
     print "---------------------------------------"
 
 # Run everything!
-#run_all_tests()
+run_all_tests()
 
 

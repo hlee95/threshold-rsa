@@ -32,12 +32,17 @@ M = get_random_prime(N,2*N)
 
 class Network:
     def __init__(self, sayingYes = []):
+        print "network init"
         self.nodes = []
         for i in range(n):
             if i in sayingYes:
-                self.nodes.append(Computer(i, True, d_i[i]))
+                self.nodes.append(Computer(i, True))
             else:
-                self.nodes.append(Computer(i, False, d_i[i]))
+                self.nodes.append(Computer(i, False))
+
+        for computer in self.nodes:
+            computer.network = self
+
         self.setup()
 
     def get_nodes(self):
@@ -48,9 +53,12 @@ class Network:
     and do the dealing of shares.
     '''
     def setup(self):
+        print "network setup"
         # first, choose N and e, and distribute d_i to everyone
         # TODO ^
-        self.generate_and_verify_N() # generate public RSA modulus N and verify it's the product of two primes
+        self.generate_N() # generate public RSA modulus N and verify it's the product of two primes
+        while not self.verify_N():
+            self.generate_N()
         self.choose_e() # choose the public encryption key e
 
         # then, run the dealing algorithm
@@ -60,15 +68,72 @@ class Network:
     Generate N, and verify that it is the product of two primes.
     At the end of this function, every computer will know N,
     '''
-    def generate_and_verify_N(self):
-        M = reduce(multiply, get_primes_in_range(n, B1)) # local M not global M
-            # this M is the product of all primes in the range (n, B1]
+    def generate_N(self):
+        print "generate N"
+        # Note this is a local M not the global M
+        # This M is the product of all primes in the range (n, B1]
+        M = reduce(multiply, get_primes_in_range(n, B1))
 
+        print "calculating p_i"
+        # First generate p_i
+        self.generate_pq(M)
+        # At this point the last value that we put as n_j should be p_i
         for computer in self.nodes:
-            computer.generate_N(M)
+            computer.p_i = computer.bgw.n_j
 
+        print "calculating q_i"
+        # Then generate q_i using the same method.
+        self.generate_pq(M)
         for computer in self.nodes:
-            pass # TODO call Brian's code that will verify self.N, and if necessary, generate_N again.
+            computer.q_i = computer.bgw.n_j
+
+        print "calcalating N"
+        # Compute N using BGW since now every computer has its own p_i and q_i
+        for computer in self.nodes:
+            computer.one_round_BGW_phase_0(M, computer.p_i, computer.q_i, computer.pq.l)
+        for computer in self.nodes:
+            computer.one_round_BGW_phase_1()
+        for computer in self.nodes:
+            computer.one_round_BGW_phase_2()
+        # At this point, every computer has its share of N as computer.bgw.n_j,
+        # so we just sum up every computer's n_j to get N
+        N = mod(sum(map(lambda comp: comp.bgw.n_j, self.nodes)), M)
+        for computer in self.nodes:
+            computer.N = N
+        print N # remove after debugging
+
+    def verify_N(self):
+        return True # TODO Brian's code here
+
+
+    '''
+    Runs the protocol to give each computer their share of p_i or q_i.
+    The same protocol is used for both p_i and q_i so we run this twice.
+    At the end of this function, self.pq.u[-1] should be the value of the share.
+    '''
+    def generate_pq(self, M):
+        print "generate pq"
+        for computer in self.nodes:
+            computer.generate_pq_setup(M)
+        while self.nodes[0].pq.round < n: # round is initialized as 0 for every computer, and updated for every computer at the same time
+            r = self.nodes[0].pq.round
+            for computer in self.nodes:
+                computer.one_round_BGW_phase_0(M, computer.pq.u[r], computer.pq.v[r], computer.pq.l)
+            for computer in self.nodes:
+                computer.one_round_BGW_phase_1()
+            for computer in self.nodes:
+                computer.one_round_BGW_phase_2()
+            for computer in self.nodes:
+                computer.generate_pq_update()
+
+
+    '''
+    Choose the public exponent randomly.
+    '''
+    def choose_e(self):
+        e = get_relatively_prime(self.nodes[0].N)
+        for computer in self.nodes:
+            computer.e = e
 
     """
     the dealing algorithm.
@@ -213,14 +278,111 @@ class Computer:
     # Stuff for Deciding N, e, d_i, g
     #####################################################
     '''
-    Protocol among the computers for generating the public RSA modulus N.
-    All arithmetic when calculating N should be done modulo M.
-    '''
-    def generate_N(self, M):
-        self.pq = PQData(M)
-        self.pq.a_i = get_relatively_prime_int(M) # Let a_i be some random integer
+    Protocol among the computers for generating the shares of p and q.
+    All arithmetic should be done modulo M.
 
-        # TODO finish
+    This function sets up the data structure needed for calculating p_i and q_i,
+    and generates a random a_i that is relatively prime to M.
+    '''
+    def generate_pq_setup(self, M):
+        # Initialize PQData with round = 0, M = M, l = floor((n-1)/2)
+        self.pq = PQData(0, M, int(math.floor((n-1/2))))
+        # Let a_i be some random integer relatively prime to M
+        self.pq.a_i = get_relatively_prime(M)
+
+        # Set the first (zeroeth) value in u and v.
+        # Since this is the first round, the first (zeroeth) computer sets u[round] = a_i
+        # but all the other computers set everything to 0
+        if self.id == self.pq.round:
+            self.pq.u.append(self.pq.a_i)
+            self.pq.v.append(1)
+        else:
+            self.pq.u.append(0)
+            self.pq.v.append(0)
+
+
+    '''
+    Receives a (f, g, h) tuple from a computer, and adds it
+    to the array self.bgw.received_fgh.
+    '''
+    def receive_fgh(self, fgh_tuple):
+        self.bgw.received_fgh.append(fgh_tuple)
+
+    '''
+    Begins to run one round of the BGW protocol (section 4.3).
+
+    When this function is called, self.pq.round is the round where the latest
+    u and v values were placed. For example, the first time one_round_BGW is called,
+    we expect round = 0 because we just started the algorithm.
+
+    Phase 0 simply sets the self.bgw data structure with the correct values.
+    '''
+    def one_round_BGW_phase_0(self, M, p_i, q_i, l):
+        # Reset to a new BGWData instance with data from the latest round.
+        self.bgw = BGWData(self.pq.M, self.pq.u[self.pq.round], self.pq.v[self.pq.round], self.pq.l)
+
+    '''
+    Phase 1 generates random coefficients for the polynomials,
+    and calculates and broadcasts the f_i(j) values to each computer j.
+    '''
+    def one_round_BGW_phase_1(self):
+        # Generate the random coefficients in arrays a, b, and c
+        # Note that a and b have length l, while c has length 2l
+        for count in xrange(self.bgw.l):
+            self.bgw.a.append(get_random_int(self.bgw.M))
+            self.bgw.b.append(get_random_int(self.bgw.M))
+            self.bgw.c.append(get_random_int(self.bgw.M))
+
+        for count_again in xrange(self.bgw.l):
+            self.bgw.c.append(get_random_int(self.bgw.M))
+
+        # Calculate and broadcast fgh tuples as descrribed in section 4.3 steps 1 and 2
+        for computer in self.network.nodes:
+            x = computer.id + 1 # the x value to evaluate the polynomial at
+            x_j = map(lambda ex: powmod(x, ex + 1, self.pq.M), range(2*self.bgw.l)) # calculate the relevant powers of x
+            f = mod(self.bgw.p_i + sum(map(lambda idx: mulmod(self.bgw.a[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
+            g = mod(self.bgw.q_i + sum(map(lambda idx: mulmod(self.bgw.b[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
+            h = mod(sum(map(lambda idx: mulmod(self.bgw.c[idx], x_j[idx], self.bgw.M), range(2*self.bgw.l))), self.bgw.M)
+            computer.receive_fgh((f, g, h))
+
+    '''
+    In phase 2, after receiving (f, g, h) tuples, the computer finishes the BGW protocol
+    by calculating N_j and then converting it to n_j, the additive share,
+    and saving the additive share in self.pq.n_j
+    '''
+    def one_round_BGW_phase_2(self):
+        # Calculate N_j as described in section 4.3 step 3
+        sum_f = 0
+        sum_g = 0
+        sum_h = 0
+        for f, g, h in self.bgw.received_fgh:
+            sum_f = mod(sum_f + f, self.pq.M)
+            sum_g = mod(sum_f + g, self.pq.M)
+            sum_h = mod(sum_h + h, self.pq.M)
+        N_j = mod(mulmod(sum_f, sum_g, self.pq.M) + sum_h, self.pq.M)
+
+        # Calculate n_j as described in section 4.3.2
+        n_j = N_j
+        for i in xrange(n):
+            if i != self.id:
+                # We add 1 to i because our i is 0-indexed and theirs is 1-indexed
+                n_j = mulmod(n_j, (i*1.0 + 1)/(i - self.id), self.pq.M)
+
+        self.bgw.n_j = n_j
+
+    '''
+    Update u and v arrays in between rounds of BGW.
+    '''
+    def generate_pq_update(self):
+        # Set the next value in self.pq.u as the share calculated in the last round of BGW
+        self.pq.u.append(self.bgw.n_j)
+        # Update the round.
+        self.pq.round += 1
+        # Set the next value in self.pq.v depending on if it's our turn or not.
+        if self.id == self.pq.round:
+            self.pq.v.append(self.pq.a_i)
+        else:
+            self.pq.v.append(0)
 
 
     #####################################################

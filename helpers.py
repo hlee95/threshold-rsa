@@ -2,6 +2,7 @@ import random
 import gmpy2
 import numpy as np
 import cPickle
+import math
 
 ########################
 # General Math Helpers
@@ -12,7 +13,7 @@ Returns a random prime number in the range [start, end)
 '''
 
 primes = cPickle.load(open("picklePrimesSmall.pkl","rb"))
-    
+
 def get_random_prime(start,end):
     i = random.randint(start,end) # better random nunber generator
     while not gmpy2.is_prime(i):
@@ -30,7 +31,7 @@ def get_random_safe_prime(start,end):
 def get_primes_in_range(a,b):
     start = np.searchsorted(primes, a)+1
     end = np.searchsorted(primes, b)+1
-    return primes[start:end]
+    return primes[start:end].tolist()
 
 # returns a number between 1 and n that is relatively prime to n
 def get_relatively_prime(n):
@@ -46,9 +47,6 @@ def GCD(a,b):
         quotient = old_r/r
         old_r,r = r,old_r-quotient*r
     return old_r
-    
-    
-    
 
 '''
 Returns a random integer between 0 and n-1.
@@ -62,6 +60,12 @@ Returns (x^y) mod m
 '''
 def powmod(x, y, m):
     return gmpy2.powmod(gmpy2.mpz(x), gmpy2.mpz(y), gmpy2.mpz(m))
+
+'''
+Returns (x*y) mod m
+'''
+def mulmod(x, y, m):
+    return mod(multiply(x, y), m)
 
 '''
 Multiply x * y
@@ -129,13 +133,19 @@ class PresigningData:
         self.D_I = None # will contain tuples of the form (x_I, [(id, h_t_i, c_prime_t_i)])
         self.S_I_t_i = None # will contain simply s_t_i
 
+
+#########################################
+# Helpers for Generating N
+#########################################
+
 '''
 Helper class for BGW Protocol data.
 '''
 class BGWData:
-    def __init__(M, p_i, q_i, l):
+    def __init__(self, M, p_i, q_i, l):
         # All variables are as described in Section 4.3, pg 14-15
         self.M = M
+        self.l = l
         self.p_i = p_i
         self.q_i = q_i
 
@@ -149,18 +159,18 @@ class BGWData:
         self.h_i_j = {}
 
         self.received_fgh = [] # array that stores the (f_i(j), g_i(j), h_i(j)) from every computer i, where j is this computer
-        self.received_N_j = [] # array that stores the N_j for all k computers
-        self.share = None # the final share returned to this user
-
+        self.n_j = None # the final share calculated
 
 '''
 Helper class (basically a struct) that stores the data that
 a computer needs for Distributed Sieving section 5.2.1 in the paper.
 '''
 class PQData:
-    def __init__(self, M):
+    def __init__(self, _round, M, l):
         # All variables are named as they are in the paper pages 17-18
+        self.round = _round # the round we are on, should start at 1
         self.M = M # M = product of all prime numbers between n and B1
+        self.l = l # l = floor((n-1)/2)
         self.a_i = None # random secret integer relatively prime to self.M
         self.u = [] # 2d array where u[i][j] is u_{i,j} in the notation of the paper
         self.v = [] # 2d array where v[i][j] is v_{i,j} in the notation of the paper

@@ -42,6 +42,8 @@ def hao_signing_test():
     print "SUBSET PRESIGNING TEST"
     print "---------------------------------------"
     network = Network(range(4, 7))
+    network.dealing_algorithm()
+    
     print "Try with 3 people."
     network.sign(100)
     print "\nTry with 4 people."
@@ -62,10 +64,21 @@ def hao_signing_test():
     print "\n signature share generation"
     network.nodes[5].signature_share_generation(523508)
 
+    
+def hao_key_generation_test():
+    print "---------------------------------------"
+    print "SUBSET PRESIGNING TEST"
+    print "---------------------------------------"
+    network = Network(range(4, 7))
+    network.private_key_generation()
+
+
+
 def run_all_tests():
     #hanna_subset_presigning_test()
-    hao_signing_test()
-    brian_dealing_tests()
+    #hao_signing_test()
+    #brian_dealing_tests()
+    hao_key_generation_test()
     print "---------------------------------------"
     print "DONE WITH TESTS"
     print "---------------------------------------"

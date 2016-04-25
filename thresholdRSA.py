@@ -23,8 +23,8 @@ N = get_random_prime(2**bits_secure,2**(bits_secure+1)-1)*get_random_prime(2**bi
 # e = the public key
 e = get_random_int(N)# TODO compute this
 d = powmod(e, -1, N)
-#creating d_is, delete later
-d_i = d_i_creator(d, n)
+#creating n d_is that sum to d mod N
+d_i = sum_genereator(d, n, N)
 
 # M = A prime number where M > N
 M = get_random_prime(N,2*N)
@@ -35,9 +35,9 @@ class Network:
         self.nodes = []
         for i in range(n):
             if i in sayingYes:
-                self.nodes.append(Computer(i, True, d_i[i]))
+                self.nodes.append(Computer(self, i, True, d_i[i]))
             else:
-                self.nodes.append(Computer(i, False, d_i[i]))
+                self.nodes.append(Computer(self, i, False, d_i[i]))
         self.setup()
 
     def get_nodes(self):
@@ -51,7 +51,7 @@ class Network:
         # first, choose N and e, and distribute d_i to everyone
         # TODO ^
         self.generate_and_verify_N() # generate public RSA modulus N and verify it's the product of two primes
-        self.choose_e() # choose the public encryption key e
+        #self.choose_e() # choose the public encryption key e
 
         # then, run the dealing algorithm
         self.dealing_algorithm()
@@ -157,20 +157,34 @@ class Network:
             t_i.subset_presigning_algorithm_phase_3()
         for t_i in I:
             t_i.subset_presigning_algorithm_phase_4()
+            
+    def private_key_generation(self,):
+        for user in self.nodes:
+            user.create_phi_i()
+            user.distribute_phi_i_j()
+        for user in self.nodes:
+            user.distribute_sum_phi_j()
+        for user in self.nodes:
+            user.generate_phi_and_psi()
+        for user in self.nodes:
+            user.generate_d_i()
+
+        
 
 class Computer:
-    def __init__(self, _id, agree):
+    def __init__(self, network, _id, agree, d_i):
+        self.network = network
         self.id = _id
         self.agree = agree
 
         # This computer's share of the secret key
-        self.d_i = 0
+        self.d_i = d_i
 
         # Variables for RSA secret keys and modulus
         self.N = None # the shared public modulus for RSA
         self.e = None # the RSA public key
-        self.p_i = None # this computer's share of prime p
-        self.q_i = None # this computer's share of prime q
+        self.p_i = 12344 # test values, this computer's share of prime p
+        self.q_i = 15125 # test values, this computer's share of prime q
         self.d_i = 0 # this computer's share of the secret key d
         # Intermediate variables needed to generate RSA modulus and secret key shares
         self.bgw = None # data for running BGW protocol; the data is replaced every time we run the protocol
@@ -182,6 +196,13 @@ class Computer:
         # the array for the commitments of of the coefficients of the polynomial
         # we get them from all other users, thus the n by n array
         self.b_i_j = [[0]*n for i in xrange(n)]
+        # to calculate the phi(n) used to recover d 
+        self.phi_i = None
+        self.phi_i_j = [0]*n #only gets one phi_i_j from each party
+        self.sum_phi_i_j = [0]*n #sum of all phi_i_j of party j, set by recieving from party j, every party will eventually have the same list
+        self.phi = None #phi(n)
+        self.psi = None #phi(n) mod e
+        self.psi_inv = None #psi inv mod e
         # Variables set at the end of the dealing algorithm
         self.S = {} #{k,M,g}
         self.P_i = [] # {{b_j,l}_j=1,...,n,l=0,...,k-1}
@@ -557,10 +578,40 @@ class Computer:
         self.signature = mod(multiply(product_c_t_i, powmod(m, -1 * multiply(self.presigning_data[self.I].x_I, M), N)), N)
 
 
-    def private_key_generation():
+    ##############################################
+    # Stuff for Private Key Generation
+    ##############################################
+
+    def recieve_phi(self, from_id, phi_i_j):
+        self.phi_i_j[from_id] = phi_i_j
+        
+    def recieve_sum_phi_j(self, from_id, sum_phi_j):
+        self.sum_phi_i_j[from_id] = sum_phi_j #sum of all phi_i_j of party j, set by recieving from party j, every party will eventually have the same list
+
+    def create_phi_i(self,):
         #step 1
-        phi_i =-(self.pi+self.qi)
+        self.phi_i =-(self.p_i+self.q_i)
         if self.id == 1:
-            phi_i = N +phi_i + i
-        #step 2
-        psi_i = phi_i
+            self.phi_i = N + self.phi_i + 1
+            
+    def distribute_phi_i_j(self,):
+        phi_i_j = sum_genereator(self.phi_i, n, N)
+        for computer in self.network.nodes:
+            computer.recieve_phi(self.id, phi_i_j[computer.id])
+   
+    def distribute_sum_phi_j(self,):
+        #Calculates sum of phi_i_j and distributes it to everyone
+        sum_phi_j = sum(self.phi_i_j)
+        for computer in self.network.nodes:
+            computer.recieve_sum_phi_j(self.id, sum_phi_j)    
+            
+    def generate_phi_and_psi(self,):
+        self.sum_phi = sum(self.sum_phi_i_j)
+        self.psi = mod(self.sum_phi, e)
+        self.psi_inv = powmod(self.psi, -1, e)
+        
+    def generate_d_i(self,):    
+        self.d_i = divide(-self.phi_i*self.psi_inv,e)
+        if self.id == 1:
+            self.d_i = divide(1-self.phi_i*self.psi_inv,e)
+        

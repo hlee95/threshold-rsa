@@ -11,7 +11,7 @@ import cPickle
 Returns a random prime number in the range [start, end)
 '''
 
-primes = cPickle.load(open("picklePrimesSmall.pkl","rb"))
+primes = cPickle.load(open("picklePrimesSmall.pkl","r"))
     
 def get_random_prime(start,end):
     i = random.randint(start,end) # better random nunber generator
@@ -33,7 +33,7 @@ def get_primes_in_range(a,b):
     return primes[start:end]
 
 # returns a number between 1 and n that is relatively prime to n
-def get_relatively_prime(n):
+def get_relatively_prime_int(n):
     guess = get_random_int(n)
     while GCD(guess,n)!=1:
         guess = get_random_int(n)
@@ -94,16 +94,14 @@ def mod(x, m):
     return remainder
 
 #[d_1, d_2...d_n] such that sum [] = d
-def d_i_creator(d, n):
+def sum_genereator(d, n, N):
     d_i = []
     #choose random values for first n-1
     for i in range(n-1):
-        d_i.append(get_random_int(divide(d, 10)))
+        d_i.append(get_random_int(N))
 
     #last one must make sum to d
-    for i in d_i:
-        d = subtract(d, i)
-    d_i.append(d)
+    d_i.append(mod(-sum(d_i), N))
     return d_i
 
 #########################################

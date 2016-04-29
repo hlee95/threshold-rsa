@@ -1,8 +1,11 @@
 import random
 import gmpy2
+from gmpy2 import mpz
 import numpy as np
 import cPickle
 import math
+import copy
+import sys
 
 ########################
 # General Math Helpers
@@ -40,13 +43,15 @@ def get_relatively_prime_int(n):
         guess = get_random_int(n)
     return guess
 
-def GCD(a,b):
-    r = b
-    old_r = a
-    while r !=0:
-        quotient = old_r/r
-        old_r,r = r,old_r-quotient*r
-    return old_r
+def get_relatively_prime_int_small(n):
+    n_prime = gmpy2.isqrt(n)
+    guess = get_random_int(n_prime)
+    while GCD(guess, n) != 1:
+        guess = get_random_int(n_prime)
+    return guess
+
+def GCD(a, b):
+    return gmpy2.gcd(a, b)
 
 '''
 Returns a random integer between 0 and n-1.

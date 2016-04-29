@@ -11,6 +11,7 @@ from thresholdRSA import *
 
 def brian_dealing_tests():
     network = Network()
+    network.setup()
     M = get_random_prime(N+1,2*N)
     print network.dealing_algorithm()
 
@@ -22,6 +23,7 @@ def hanna_subset_presigning_test():
     print "SUBSET PRESIGNING TEST"
     print "---------------------------------------"
     network = Network(range(4, 7))
+    network.setup()
     print "Try with 3 people."
     network.sign(100)
     print "\nTry with 4 people."
@@ -37,11 +39,36 @@ def hanna_subset_presigning_test():
     network.nodes[5].change_choice(True)
     network.sign(500)
 
+def hanna_bgw_test():
+    network = Network([])
+    p = [0, 3, 0, 0, 0]
+    q = [0, 1, 0, 0, 0]
+    real_N = sum(p) * sum(q)
+    print "real_N: ", real_N
+    M = 521
+    print "M: ", M
+    for i in xrange(5):
+        network.nodes[i].one_round_BGW_phase_0(M, p[i], q[i], 2)
+    for computer in network.nodes:
+        computer.one_round_BGW_phase_1()
+    for computer in network.nodes:
+        computer.one_round_BGW_phase_2()
+
+    test_N = 0
+    for computer in network.nodes:
+        test_N += computer.bgw.n_j
+        print "n_j: ", computer.bgw.n_j
+    test_N = mod(test_N, M)
+    print "test_N: ", test_N
+    print test_N == real_N
+
+
 def hao_signing_test():
     print "---------------------------------------"
-    print "SUBSET PRESIGNING TEST"
+    print "SIGNING TEST"
     print "---------------------------------------"
     network = Network(range(4, 7))
+    network.setup()
     network.dealing_algorithm()
 
     print "Try with 3 people."
@@ -75,9 +102,10 @@ def hao_key_generation_test():
 
 def run_all_tests():
     #hanna_subset_presigning_test()
+    hanna_bgw_test()
     #hao_signing_test()
     #brian_dealing_tests()
-    hao_key_generation_test()
+    #hao_key_generation_test()
     print "---------------------------------------"
     print "DONE WITH TESTS"
     print "---------------------------------------"

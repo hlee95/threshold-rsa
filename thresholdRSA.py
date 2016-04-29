@@ -1,33 +1,32 @@
 from helpers import *
-import copy
 
 # global variables
 # n = number of computers in the network
-n = 10
+n = 5
 # k = number of people who have to agree
 k = 4
 # g is an agreed upon element in Z*_n that has high order
-g = 101 # TODO compute this
+# g = 101 # TODO compute this
 # e = the public key
-e = 1 # TODO compute this
+# e = 1 # TODO compute this
 # B1 is the bound used in 5.2.1 distributed sieving method, TODO not exactly sure how to compute
-B1 = 2 << 10
+B1 = 2 << 14
 
 # N = public modulus
 # for now lets just make the the product of 2 large random primes
 bits_secure = 1024
-N = get_random_prime(2**bits_secure,2**(bits_secure+1)-1)*get_random_prime(2**bits_secure,2**(bits_secure+1)-1)
+# N = get_random_prime(2**bits_secure,2**(bits_secure+1)-1)*get_random_prime(2**bits_secure,2**(bits_secure+1)-1)
 #print "N=",N
 
 #N = get_random_safe_prime(2**bits_secure,2**(bits_secure+1)-1)*get_random_prime(2**bits_secure,2**(bits_secure+1)-1)
 # e = the public key
-e = get_random_int(N)# TODO compute this
-d = powmod(e, -1, N)
+#e = get_random_int(N)# TODO compute this
+#d = powmod(e, -1, N)
 #creating n d_is that sum to d mod N
-d_i = sum_genereator(d, n, N)
+#d_i = sum_genereator(d, n, N)
 
 # M = A prime number where M > N
-M = get_random_prime(N,2*N)
+# M = get_random_prime(N,2*N)
 #print "M=",M
 
 class Network:
@@ -36,10 +35,9 @@ class Network:
         self.nodes = []
         for i in range(n):
             if i in sayingYes:
-                self.nodes.append(Computer(self, i, True, d_i[i]))
+                self.nodes.append(Computer(self, i, True))
             else:
-                self.nodes.append(Computer(self, i, False, d_i[i]))
-        self.setup()
+                self.nodes.append(Computer(self, i, False))
 
     def get_nodes(self):
         return self.nodes
@@ -51,12 +49,13 @@ class Network:
     def setup(self):
         print "network setup"
         # first, choose N and e, and distribute d_i to everyone
-        self.generate_N() # generate public RSA modulus N and verify it's the product of two primes
+        self.generate_N() # generate public RSA modulus N, and large M
         while not self.verify_N():
             self.generate_N()
-        self.choose_e() # choose the public encryption key e
+        self.choose_e_and_g() # choose the public encryption key e and generator g
 
         # private key generation, TODO Hao
+        self.private_key_generation()
 
         # then, run the dealing algorithm
         self.dealing_algorithm()
@@ -69,7 +68,12 @@ class Network:
         print "generate N"
         # Note this is a local M not the global M
         # This M is the product of all primes in the range (n, B1]
-        M = reduce(multiply, get_primes_in_range(n, B1))
+        M = reduce(multiply, get_primes_in_range(n + 1, B1))
+
+        print "M: ", M
+
+        for computer in self.nodes:
+            computer.M = M
 
         print "calculating p_i"
         # First generate p_i
@@ -97,9 +101,18 @@ class Network:
         N = mod(sum(map(lambda comp: comp.bgw.n_j, self.nodes)), M)
         for computer in self.nodes:
             computer.N = N
-        print N # remove after debugging
+        print "N: ", N # remove after debugging
 
     def verify_N(self):
+        p = sum(map(lambda comp: comp.p_i, self.nodes))
+        print "p: ", p
+        q = sum(map(lambda comp: comp.q_i, self.nodes))
+        print "q: ", q
+        test_N = multiply(p, q)
+        print test_N
+        if mod(test_N, self.nodes[0].M) != self.nodes[0].N:
+            raise RuntimeError("verification of N failed.")
+
         return True # TODO Brian's code here
 
 
@@ -109,11 +122,19 @@ class Network:
     At the end of this function, self.pq.u[-1] should be the value of the share.
     '''
     def generate_pq(self, M):
-        print "generate pq"
         for computer in self.nodes:
             computer.generate_pq_setup(M)
+        # check to make sure stuff makes sense
+        # gcd(a, M) should be 1
+        a = reduce(multiply, map(lambda comp: comp.pq.a_i, self.nodes))
+        print "a: ", a
+        print "a mod M: ", mod(a, M)
+        # if GCD(a, M) != 1:
+        #     raise RuntimeError("gcd(a, M) is not 1 in generate_pq")
+
         while self.nodes[0].pq.round < n: # round is initialized as 0 for every computer, and updated for every computer at the same time
             r = self.nodes[0].pq.round
+            print r
             for computer in self.nodes:
                 computer.one_round_BGW_phase_0(M, computer.pq.u[r], computer.pq.v[r], computer.pq.l)
             for computer in self.nodes:
@@ -125,12 +146,15 @@ class Network:
 
 
     '''
-    Choose the public exponent randomly.
+    Choose the public exponent and the generator randomly.
     '''
-    def choose_e(self):
-        e = get_relatively_prime(self.nodes[0].N)
+    def choose_e_and_g(self):
+        e = get_relatively_prime_int(self.nodes[0].N)
+        g = get_random_int(self.nodes[0].N) # TODO: check this
         for computer in self.nodes:
             computer.e = e
+            computer.g = g
+
 
     """
     the dealing algorithm.
@@ -147,11 +171,11 @@ class Network:
     def dealing_algorithm(self):
         for user in self.nodes:
             #calculation phase
-            user.dealing_phase_1(M,k,g,self.nodes)
+            user.dealing_phase_1(self.nodes[0].M,k,self.nodes[0].g,self.nodes)
         for user in self.nodes:
             #print "user id = ",user.id+1
             #verfication phase
-            if not user.dealing_phase_2(M,k,g,self.nodes):
+            if not user.dealing_phase_2(self.nodes[0].M,k,self.nodes[0].g,self.nodes):
                 print "aborted, user",user.id+1,", found an error"
                 return False
         return True
@@ -179,14 +203,9 @@ class Network:
         # subset presigning algorithm before, then run it
         if I not in I[0].subsets:
             self.subset_presigning_algorithm(I)
-            # # remove these prints after debugging
-            # for i in xrange(k):
-            #     for item in I[i].get_current_subset_presigning_data():
-            #         print item
         else:
             print "This subset has already run the presigning algorithm."
 
-        ''' major TODO: all this stuff '''
         # Have each party generate a signature share and proof
         #     (so basically do 6.2.3 and 6.2.4)
         for computer in I:
@@ -231,23 +250,20 @@ class Network:
         for user in self.nodes:
             user.generate_d_i()
 
-
-
 class Computer:
-    def __init__(self, network, _id, agree, d_i):
+    def __init__(self, network, _id, agree):
         self.network = network
         self.id = _id
         self.agree = agree
 
-        # This computer's share of the secret key
-        self.d_i = d_i
-
         # Variables for RSA secret keys and modulus
         self.N = None # the shared public modulus for RSA
+        self.M = None # some number larger than N
+        self.g = None # the generator, something that has high order in Z*_n
         self.e = None # the RSA public key
-        self.p_i = 12344 # test values, this computer's share of prime p
-        self.q_i = 15125 # test values, this computer's share of prime q
-        self.d_i = 0 # this computer's share of the secret key d
+        self.p_i = None #12344 # test values, this computer's share of prime p
+        self.q_i = None #15125 # test values, this computer's share of prime q
+        self.d_i = None # this computer's share of the secret key d
         # Intermediate variables needed to generate RSA modulus and secret key shares
         self.bgw = None # data for running BGW protocol; the data is replaced every time we run the protocol
         self.pq = None # data to store intermediate values
@@ -271,7 +287,7 @@ class Computer:
         self.S_i = {} # #{d_i,{a_i,j}_j=1,...,k-1,{f_j,i}_i!=j}
 
         # Variables for the subset presigning algorithm
-        self.dummy_message = powmod(2, e, N)
+        self.dummy_message = None
         self.I = None # the current subset
         self.I_prime = None # the complement of the current subset
         self.subsets = [] # this is a history of all subsets that this computer has been part of
@@ -306,8 +322,8 @@ class Computer:
         # Initialize PQData with round = 0, M = M, l = floor((n-1)/2)
         self.pq = PQData(0, M, int(math.floor((n-1/2))))
         # Let a_i be some random integer relatively prime to M
-        self.pq.a_i = get_relatively_prime(M)
-
+        self.pq.a_i = get_relatively_prime_int_small(M)
+        print "a_i: ", self.pq.a_i
         # Set the first (zeroeth) value in u and v.
         # Since this is the first round, the first (zeroeth) computer sets u[round] = a_i
         # but all the other computers set everything to 0
@@ -325,6 +341,7 @@ class Computer:
     '''
     def receive_fgh(self, fgh_tuple):
         self.bgw.received_fgh.append(fgh_tuple)
+        # print "fgh: ", fgh_tuple
 
     '''
     Begins to run one round of the BGW protocol (section 4.3).
@@ -337,8 +354,8 @@ class Computer:
     '''
     def one_round_BGW_phase_0(self, M, p_i, q_i, l):
         # Reset to a new BGWData instance with data from the latest round.
-        self.bgw = BGWData(self.pq.M, self.pq.u[self.pq.round], self.pq.v[self.pq.round], self.pq.l)
-
+        # self.bgw = BGWData(self.pq.M, self.pq.u[self.pq.round], self.pq.v[self.pq.round], self.pq.l)
+        self.bgw = BGWData(M, p_i, q_i, l)
     '''
     Phase 1 generates random coefficients for the polynomials,
     and calculates and broadcasts the f_i(j) values to each computer j.
@@ -346,21 +363,27 @@ class Computer:
     def one_round_BGW_phase_1(self):
         # Generate the random coefficients in arrays a, b, and c
         # Note that a and b have length l, while c has length 2l
-        for count in xrange(self.bgw.l):
-            self.bgw.a.append(get_random_int(self.bgw.M))
-            self.bgw.b.append(get_random_int(self.bgw.M))
-            self.bgw.c.append(get_random_int(self.bgw.M))
+        # for count in xrange(self.bgw.l):
+        #     self.bgw.a.append(get_random_int(self.bgw.M))
+        #     self.bgw.b.append(get_random_int(self.bgw.M))
+        #     self.bgw.c.append(get_random_int(self.bgw.M))
 
-        for count_again in xrange(self.bgw.l):
-            self.bgw.c.append(get_random_int(self.bgw.M))
+        # for count_again in xrange(self.bgw.l):
+        #     self.bgw.c.append(get_random_int(self.bgw.M))
+
+        self.bgw.a = [1 for i in xrange(self.bgw.l)]
+        self.bgw.b = [1 for i in xrange(self.bgw.l)]
+        self.bgw.c = [1 for i in xrange(2*self.bgw.l)]
+
 
         # Calculate and broadcast fgh tuples as descrribed in section 4.3 steps 1 and 2
         for computer in self.network.nodes:
             x = computer.id + 1 # the x value to evaluate the polynomial at
-            x_j = map(lambda ex: powmod(x, ex + 1, self.pq.M), range(2*self.bgw.l)) # calculate the relevant powers of x
+            x_j = map(lambda ex: powmod(x, ex + 1, self.bgw.M), range(2*self.bgw.l)) # calculate the relevant powers of x
             f = mod(self.bgw.p_i + sum(map(lambda idx: mulmod(self.bgw.a[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
             g = mod(self.bgw.q_i + sum(map(lambda idx: mulmod(self.bgw.b[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
             h = mod(sum(map(lambda idx: mulmod(self.bgw.c[idx], x_j[idx], self.bgw.M), range(2*self.bgw.l))), self.bgw.M)
+            #print "i: ", self.id + 1, "j: ", computer.id + 1, (f, g, h)
             computer.receive_fgh((f, g, h))
 
     '''
@@ -374,19 +397,20 @@ class Computer:
         sum_g = 0
         sum_h = 0
         for f, g, h in self.bgw.received_fgh:
-            sum_f = mod(sum_f + f, self.pq.M)
-            sum_g = mod(sum_f + g, self.pq.M)
-            sum_h = mod(sum_h + h, self.pq.M)
-        N_j = mod(mulmod(sum_f, sum_g, self.pq.M) + sum_h, self.pq.M)
-
+            print "fgh: ", (f, g, h)
+            sum_f = mod(sum_f + f, self.bgw.M)
+            sum_g = mod(sum_g + g, self.bgw.M)
+            sum_h = mod(sum_h + h, self.bgw.M)
+        print sum_f, sum_g, sum_h
+        N_j = mod(multiply(sum_f, sum_g) + sum_h, self.bgw.M)
+        print "N_j: ", N_j
         # Calculate n_j as described in section 4.3.2
         n_j = N_j
-        for i in xrange(n):
-            if i != self.id:
-                # We add 1 to i because our i is 0-indexed and theirs is 1-indexed
-                n_j = mulmod(n_j, (i*1.0 + 1)/(i - self.id), self.pq.M)
+        for h in xrange(k):
+            if h != self.id:
+                n_j *= (h*1.0 + 1) / (h - self.id)
 
-        self.bgw.n_j = n_j
+        self.bgw.n_j = mod(n_j, self.bgw.M)
 
     '''
     Update u and v arrays in between rounds of BGW.
@@ -398,6 +422,7 @@ class Computer:
         self.pq.round += 1
         # Set the next value in self.pq.v depending on if it's our turn or not.
         if self.id == self.pq.round:
+            print "updated!"
             self.pq.v.append(self.pq.a_i)
         else:
             self.pq.v.append(0)
@@ -443,7 +468,7 @@ class Computer:
                 user.f_i_j[self.id]=f_i_j#%M
         for user in S:
             for j in xrange(0,k):
-                user.b_i_j[self.id][j]=powmod(g,self.a_i_j[j],N)
+                user.b_i_j[self.id][j]=powmod(g,self.a_i_j[j],self.N)
             #print "the bs for user",user.id+1,"is",user.b_i_j[self.id]
 
     def dealing_phase_2(self,M,k,g,S):
@@ -455,16 +480,16 @@ class Computer:
                 #print "checking user ",user_iid
                 #print "f_i_j user",user_i.id,self.f_i_j[user_i.id]
                 #print "g=",g,"self.f_i_j[user_i.id]=",self.f_i_j[user_i.id],"N=",N
-                g_exp_f_i_j = powmod(g,self.f_i_j[user_i.id],N)
+                g_exp_f_i_j = powmod(g,self.f_i_j[user_i.id], self.N)
                 #print self.f_i_j[user_i.id]
                 checker = gmpy2.mpz(1)
                 for t in xrange(k):
                     #print "b_i_j[t] t = ",t,self.b_i_j[user_i.id][t]
                     #print "new multiplicand to checker = ",powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N)
-                    checker=multiply(checker,powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N))
+                    checker=multiply(checker,powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,self.N),self.N))
                     #print "powmod(selfid,t,N)",powmod(selfid,t,N)
                     #print powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N)
-                checker = mod(checker,N)
+                checker = mod(checker,self.N)
                 #print "checker",checker
                 #print "g^f_i_j",g_exp_f_i_j
                 #print
@@ -545,6 +570,7 @@ class Computer:
         # Add this set I to the self.subsets array and create a new PresigningData instance
         self.subsets.append(self.I)
         self.presigning_data[self.I] = PresigningData()
+        self.dummy_message = powmod(2, self.e, self.N)
 
     '''
     Phase 1 involves calculating lambda_t_i, s_t_i, and h_t_i,
@@ -557,17 +583,17 @@ class Computer:
             if computer.id == self.id:
                 continue
             lambda_t_i *= (computer.id + 1)/(computer.id - self.id) # We need the "+1" because otherwise we could get 0
-            lambda_t_i = mod(lambda_t_i, M)
+            lambda_t_i = mod(lambda_t_i, self.M)
         self.presigning_data[self.I].lambda_t_i = lambda_t_i
 
         # Compute s_t_i = (sum(f_i_j) * lambda_t_i) % M
         I_prime_ids = map(lambda computer: computer.id, self.I_prime)
-        s_t_i = multiply(sum([self.f_i_j[i] for i in I_prime_ids]), lambda_t_i) % M
+        s_t_i = multiply(sum([self.f_i_j[i] for i in I_prime_ids]), lambda_t_i) % self.M
         self.presigning_data[self.I].s_t_i = s_t_i
         self.presigning_data[self.I].S_I_t_i = s_t_i
 
         # Compute h_t_i
-        h_t_i = powmod(g, s_t_i, N)
+        h_t_i = powmod(self.g, s_t_i, self.N)
         self.presigning_data[self.I].h_t_i = h_t_i
 
         # Broadcast h_t_i so other computers can use it to verify later,
@@ -606,18 +632,17 @@ class Computer:
         # Calculate the product of the received signature shares.
         product_c_prime_t_i = mod(reduce(multiply,
             map(lambda sigma: sigma[0],
-                self.sigmas)), N)
+                self.sigmas)), self.N)
         # Calculate 2^(e*M) % N
-        two_e_M = powmod(2, multiply(e, M), N)
+        two_e_M = powmod(2, multiply(self.e, self.M), self.N)
         # Search for the value of x_I that makes the product = 2 * (2^(e*M*x_I))
         x_I = None
         for x in possible_x_I:
-            if product_c_prime_t_i == multiply(2, powmod(two_e_M, x, N)) :
+            if product_c_prime_t_i == mod(multiply(2, powmod(two_e_M, x, self.N)), self.N) :
                 x_I = x
                 break
         if x_I is None:
-            x_I = 6 # random number for testing
-            # raise RuntimeError("Couldn't find viable x_I in subset presigning algorithm, computer " + str(self.id))
+            raise RuntimeError("Couldn't find viable x_I in subset presigning algorithm, computer " + str(self.id))
         self.presigning_data[self.I].x_I = x_I
 
         # Broadcast x_I so everyone can verify that they found the same x_I
@@ -685,12 +710,12 @@ class Computer:
         s_i = self.presigning_data[self.I].S_I_t_i
         b_ti0 = self.b_i_j[self.id][0]
         h_ti = self.presigning_data[self.I].h_t_i
-        c_i = powmod(m, s_i+d_i, N)
-        s = get_random_int(N)
-        c = get_random_int(N)
+        c_i = powmod(m, s_i+d_i, self.N)
+        s = get_random_int(self.N)
+        c = get_random_int(self.N)
         r= s+c*(s_i+d_i)
-        m_s = powmod(m, s, N)
-        g_s = powmod(g, s, N)
+        m_s = powmod(m, s, self.N)
+        g_s = powmod(self.g, s, self.N)
         proof = [(g_s, m_s), c_i, r, c] #
         sigma = (m, proof) #TODO: actually calculate sigma = (signature, proof)
 
@@ -711,9 +736,9 @@ class Computer:
             [(g_s, m_s), c_i, r, c] = proof
             b_ti0 = self.b_i_j[s_id][0]
             h_ti = self.presigning_data[self.I].received_h_t_i[s_id]
-            if powmod(g, r, N) != mod(g_s*powmod(b_ti0*h_ti, c, N), N):
+            if powmod(self.g, r, self.N) != mod(g_s*powmod(b_ti0*h_ti, c, self.N), self.N):
                 return False
-            if powmod(m, r, N) != mod(m_s*powmod(c_i, c, N), N):
+            if powmod(m, r, self.N) != mod(m_s*powmod(c_i, c, self.N), self.N):
                 return False
         return True # TODO actually verify each sigma
 
@@ -732,44 +757,44 @@ class Computer:
         # stored in self.sigmas
 
         # Calculate the product of c_{t_i} for t_i in I
-        product_c_t_i = mod(reduce(multiply, map(lambda sigma: sigma[1][0], self.sigmas)), N)
+        product_c_t_i = mod(reduce(multiply, map(lambda sigma: sigma[1][0], self.sigmas)), self.N)
         # Calculate the final signature = m^(-x_I * M) * the product
-        self.signature = mod(multiply(product_c_t_i, powmod(m, -1 * multiply(self.presigning_data[self.I].x_I, M), N)), N)
+        self.signature = mod(multiply(product_c_t_i, powmod(m, -1 * multiply(self.presigning_data[self.I].x_I, self.M), self.N)), self.N)
 
 
     ##############################################
     # Stuff for Private Key Generation
     ##############################################
 
-    def recieve_phi(self, from_id, phi_i_j):
+    def receive_phi(self, from_id, phi_i_j):
         self.phi_i_j[from_id] = phi_i_j
 
-    def recieve_sum_phi_j(self, from_id, sum_phi_j):
+    def receive_sum_phi_j(self, from_id, sum_phi_j):
         self.sum_phi_i_j[from_id] = sum_phi_j #sum of all phi_i_j of party j, set by recieving from party j, every party will eventually have the same list
 
     def create_phi_i(self,):
         #step 1
         self.phi_i =-(self.p_i+self.q_i)
         if self.id == 1:
-            self.phi_i = N + self.phi_i + 1
+            self.phi_i = self.N + self.phi_i + 1
 
     def distribute_phi_i_j(self,):
-        phi_i_j = sum_genereator(self.phi_i, n, N)
+        phi_i_j = sum_genereator(self.phi_i, n, self.N)
         for computer in self.network.nodes:
-            computer.recieve_phi(self.id, phi_i_j[computer.id])
+            computer.receive_phi(self.id, phi_i_j[computer.id])
 
     def distribute_sum_phi_j(self,):
         #Calculates sum of phi_i_j and distributes it to everyone
         sum_phi_j = sum(self.phi_i_j)
         for computer in self.network.nodes:
-            computer.recieve_sum_phi_j(self.id, sum_phi_j)
+            computer.receive_sum_phi_j(self.id, sum_phi_j)
 
     def generate_phi_and_psi(self,):
         self.sum_phi = sum(self.sum_phi_i_j)
-        self.psi = mod(self.sum_phi, e)
-        self.psi_inv = powmod(self.psi, -1, e)
+        self.psi = mod(self.sum_phi, self.e)
+        self.psi_inv = powmod(self.psi, -1, self.e)
 
     def generate_d_i(self,):
-        self.d_i = divide(-self.phi_i*self.psi_inv,e)
+        self.d_i = divide(-self.phi_i*self.psi_inv, self.e)
         if self.id == 1:
-            self.d_i = divide(1-self.phi_i*self.psi_inv,e)
+            self.d_i = divide(1-self.phi_i*self.psi_inv, self.e)

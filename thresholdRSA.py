@@ -393,9 +393,7 @@ class Computer:
     '''
     def one_round_BGW_phase_2(self):
         # Calculate N_j as described in section 4.3 step 3
-        sum_f = 0
-        sum_g = 0
-        sum_h = 0
+        sum_f = sum_g = sum_h = 0
         for f, g, h in self.bgw.received_fgh:
             print "fgh: ", (f, g, h)
             sum_f = mod(sum_f + f, self.bgw.M)
@@ -406,7 +404,7 @@ class Computer:
         print "N_j: ", N_j
         # Calculate n_j as described in section 4.3.2
         n_j = N_j
-        for h in xrange(k):
+        for h in xrange(n):
             if h != self.id:
                 n_j *= (h*1.0 + 1) / (h - self.id)
 

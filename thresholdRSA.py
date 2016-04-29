@@ -11,6 +11,8 @@ k = 4
 # e = 1 # TODO compute this
 # B1 is the bound used in 5.2.1 distributed sieving method, TODO not exactly sure how to compute
 B1 = 2 << 14
+# B2 is the bound used in 5.2.3
+B2 = 2**19 #we need this to be lower than our list of primes
 
 # N = public modulus
 # for now lets just make the the product of 2 large random primes
@@ -114,6 +116,26 @@ class Network:
             raise RuntimeError("verification of N failed.")
 
         return True # TODO Brian's code here
+
+    # each computer tries and checks if the N they all have is divisible by any small number
+    def parallel_trial_division(self):
+        for computer in self.nodes:
+            if not computer.trial_division():
+                print "bad N fails trial division"
+                return False
+        return True
+
+    # check if N is prime:
+    def load_balance_primality_test(self,N):
+        #N = self.N
+        g = get_relatively_prime_int(N)
+        for computer in self.nodes:
+            computer.load_balance_primality_test_phase_1(g)
+        for computer in self.nodes:
+            if not computer.load_balance_primality_test_phase_2(g):
+                print "N is not prime"
+                return False
+        return True
 
 
     '''
@@ -267,6 +289,9 @@ class Computer:
         # Intermediate variables needed to generate RSA modulus and secret key shares
         self.bgw = None # data for running BGW protocol; the data is replaced every time we run the protocol
         self.pq = None # data to store intermediate values
+
+        # to check if N is the product of two primes
+        self.v = [0]*n
 
         # Variables for the dealing algorithm
         self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
@@ -424,6 +449,39 @@ class Computer:
             self.pq.v.append(self.pq.a_i)
         else:
             self.pq.v.append(0)
+
+    # check for small factors of N
+    def trial_division(self):
+        N = self.N
+        primes = get_primes_in_range(B1,B2)
+        for prime in primes:
+            if (prime%n)==self.id:
+                if N%prime==0:
+                    return False
+        return True
+
+    # check if N is prime
+    # broadcast phase
+    def load_balance_primality_test_phase_1(self,g):
+        N = self.N
+        if self.id == 0:
+            v = powmod(g,N-self.p_i-self.q_i+1,N)
+        else:
+            v = powmod(g,self.p_i+self.q_i,N)
+        for computer in self.network.nodes:
+            computer.v[self.id]=v
+            
+    # checking phase
+    def load_balance_primality_test_phase_2(self,g):
+        N = self.N
+        v1 = self.v[0]
+        rest = 1
+        for i in range(1,n):
+            rest = mulmod(rest,self.v[i],N)
+        if v1 != rest:
+            print "bad N"
+            return False
+        return True
 
 
     #####################################################

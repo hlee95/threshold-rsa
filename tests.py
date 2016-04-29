@@ -16,6 +16,31 @@ def brian_dealing_tests():
     print network.dealing_algorithm()
 
 
+# works with hard coded N must be changed in code
+# as in the function should not normally take an N so it has to be changed
+# should get in in sync with the rest so it checks the generated N
+def brian_parallel_trial_division():
+    network = Network()
+    #network.setup()
+    N = 32771*32779*32868
+    print "should be false"
+    print network.parallel_trial_division(N)
+    N = 1000000007
+    print "should be true"
+    print network.parallel_trial_division(N)
+#brian_parallel_trial_division()
+
+def brian_primality_test():
+    network = Network()
+    network.setup()
+    print "should be false"
+    print network.load_balance_primality_test()
+    print "should be true"
+    print network.load_balance_primality_test()
+#brian_primality_test()
+    
+
+
 # Just observe the output and make sure it's right.
 # (Expect to fail, then [0, 1, 2, 5], then fail, then [0, 1, 2, 6], then fail.)
 def hanna_subset_presigning_test():

@@ -51,7 +51,7 @@ def get_relatively_prime_int_small(n):
     return guess
 
 def GCD(a, b):
-    return gmpy2.gcd(a, b)
+    return gmpy2.gcd(gmpy2.mpz(a), gmpy2.mpz(b))
 
 '''
 Returns a random integer between 0 and n-1.
@@ -78,6 +78,11 @@ Multiply x * y
 def multiply(x, y):
     return gmpy2.mul(gmpy2.mpz(x), gmpy2.mpz(y))
 
+'''
+Add x + y
+'''
+def add(x, y):
+    return gmpy2.add(gmpy2.mpz(x), gmpy2.mpz(y))
 
 '''
 Divide x / y

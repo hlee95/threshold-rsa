@@ -10,7 +10,7 @@ k = 4
 # e = the public key
 # e = 1 # TODO compute this
 # B1 is the bound used in 5.2.1 distributed sieving method, TODO not exactly sure how to compute
-B1 = 2 << 14
+B1 = 1 << 10
 # B2 is the bound used in 5.2.3
 B2 = 2**19 #we need this to be lower than our list of primes
 
@@ -70,6 +70,7 @@ class Network:
         print "generate N"
         # Note this is a local M not the global M
         # This M is the product of all primes in the range (n, B1]
+
         M = reduce(multiply, get_primes_in_range(n + 1, B1))
 
         print "M: ", M
@@ -84,11 +85,18 @@ class Network:
         for computer in self.nodes:
             computer.p_i = computer.bgw.n_j
 
+        return
+
         print "calculating q_i"
         # Then generate q_i using the same method.
         self.generate_pq(M)
         for computer in self.nodes:
             computer.q_i = computer.bgw.n_j
+
+        # Now, M is a large prime, larger than N
+        M = get_random_prime(1 << 1024, 1 << 1025)
+        for computer in self.nodes:
+            computer.M = M
 
         print "calcalating N"
         # Compute N using BGW since now every computer has its own p_i and q_i
@@ -128,12 +136,16 @@ class Network:
     # check if N is prime:
     def load_balance_primality_test(self,N):
         #N = self.N
+        N - self.nodes[0].N
+        for computer in self.nodes:
+            if N!= computer.N:
+                raise RuntimeError("Not all computers had the same N")
         g = get_relatively_prime_int(N)
         for computer in self.nodes:
             computer.load_balance_primality_test_phase_1(g)
         for computer in self.nodes:
             if not computer.load_balance_primality_test_phase_2(g):
-                print "N is not prime"
+                print "N is not the product of two primes"
                 return False
         return True
 
@@ -148,15 +160,18 @@ class Network:
             computer.generate_pq_setup(M)
         # check to make sure stuff makes sense
         # gcd(a, M) should be 1
-        a = reduce(multiply, map(lambda comp: comp.pq.a_i, self.nodes))
+        a = reduce(multiply, [comp.pq.a_i for comp in self.nodes])
         print "a: ", a
         print "a mod M: ", mod(a, M)
-        # if GCD(a, M) != 1:
-        #     raise RuntimeError("gcd(a, M) is not 1 in generate_pq")
+        if GCD(a, M) != 1:
+            raise RuntimeError("gcd(a, M) is not 1 in generate_pq")
 
-        while self.nodes[0].pq.round < n: # round is initialized as 0 for every computer, and updated for every computer at the same time
+        while self.nodes[0].pq.round < 1: # round is initialized as 0 for every computer, and updated for every computer at the same time
             r = self.nodes[0].pq.round
             print r
+            for computer in self.nodes:
+                if len(computer.pq.u) != r+1 or len(computer.pq.v) != r+1:
+                    raise RuntimeError("Wrong length for u or v, computer ", computer.id)
             for computer in self.nodes:
                 computer.one_round_BGW_phase_0(M, computer.pq.u[r], computer.pq.v[r], computer.pq.l)
             for computer in self.nodes:
@@ -348,7 +363,9 @@ class Computer:
         self.pq = PQData(0, M, int(math.floor((n-1/2))))
         # Let a_i be some random integer relatively prime to M
         self.pq.a_i = get_relatively_prime_int_small(M)
-        print "a_i: ", self.pq.a_i
+        if GCD(self.pq.a_i, M) != 1:
+            raise RuntimeError("The impossible has happened.")
+        print "a_i computer: ", self.id, self.pq.a_i
         # Set the first (zeroeth) value in u and v.
         # Since this is the first round, the first (zeroeth) computer sets u[round] = a_i
         # but all the other computers set everything to 0
@@ -408,7 +425,6 @@ class Computer:
             f = mod(self.bgw.p_i + sum(map(lambda idx: mulmod(self.bgw.a[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
             g = mod(self.bgw.q_i + sum(map(lambda idx: mulmod(self.bgw.b[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
             h = mod(sum(map(lambda idx: mulmod(self.bgw.c[idx], x_j[idx], self.bgw.M), range(2*self.bgw.l))), self.bgw.M)
-            #print "i: ", self.id + 1, "j: ", computer.id + 1, (f, g, h)
             computer.receive_fgh((f, g, h))
 
     '''
@@ -420,17 +436,15 @@ class Computer:
         # Calculate N_j as described in section 4.3 step 3
         sum_f = sum_g = sum_h = 0
         for f, g, h in self.bgw.received_fgh:
-            print "fgh: ", (f, g, h)
-            sum_f = mod(sum_f + f, self.bgw.M)
-            sum_g = mod(sum_g + g, self.bgw.M)
-            sum_h = mod(sum_h + h, self.bgw.M)
-        print sum_f, sum_g, sum_h
-        N_j = mod(multiply(sum_f, sum_g) + sum_h, self.bgw.M)
-        print "N_j: ", N_j
+            sum_f = mod(add(sum_f, f), self.bgw.M)
+            sum_g = mod(add(sum_g, g), self.bgw.M)
+            sum_h = mod(add(sum_h, h), self.bgw.M)
+        N_j = mod(add(multiply(sum_f, sum_g), sum_h), self.bgw.M)
         # Calculate n_j as described in section 4.3.2
         n_j = N_j
         for h in xrange(n):
             if h != self.id:
+                # Don't use mpz because mpz doesn't play nice with floats
                 n_j *= (h*1.0 + 1) / (h - self.id)
 
         self.bgw.n_j = mod(n_j, self.bgw.M)
@@ -470,7 +484,7 @@ class Computer:
             v = powmod(g,self.p_i+self.q_i,N)
         for computer in self.network.nodes:
             computer.v[self.id]=v
-            
+
     # checking phase
     def load_balance_primality_test_phase_2(self,g):
         N = self.N

@@ -109,7 +109,7 @@ def hanna_bgw_test():
 
 def hanna_generate_pq_test():
     network = Network([])
-    network.generate_N()
+    network.generate_N(True)
 
 def hao_signing_test():
     print "---------------------------------------"

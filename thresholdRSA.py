@@ -80,7 +80,7 @@ class Network:
 
         #print "calculating p_i"
         # First generate p_i
-        self.generate_pq(M)
+        self.generate_pq(M, debug)
 
         # for hanna_generate_pq_test
         if debug:
@@ -92,7 +92,7 @@ class Network:
 
         #print "calculating q_i"
         # Then generate q_i using the same method.
-        self.generate_pq(M)
+        self.generate_pq(M, debug)
         for computer in self.nodes:
             computer.q_i = computer.bgw.n_j
 
@@ -157,7 +157,7 @@ class Network:
     The same protocol is used for both p_i and q_i so we run this twice.
     At the end of this function, self.pq.u[-1] should be the value of the share.
     '''
-    def generate_pq(self, M):
+    def generate_pq(self, M, debug=False):
         for computer in self.nodes:
             computer.generate_pq_setup(M)
         # print "M", M
@@ -181,19 +181,16 @@ class Network:
                 computer.one_round_BGW_phase_1()
             for computer in self.nodes:
                 computer.one_round_BGW_phase_2()
-            # test
+            # for debugging
             product = mod(reduce(multiply, [self.nodes[i].pq.a_i for i in xrange(r+1)]), M)
             current_sum = mod(reduce(add, [comp.bgw.n_j for comp in self.nodes]), M)
-            sum_mod = mod(current_sum, M)
-            if product != sum_mod:
+            if product != current_sum:
                 raise RuntimeError("product of a_i so far not equal to sum of the latest bgw shares")
             for computer in self.nodes:
                 computer.generate_pq_update()
-            # check that the sum of everyone's v is equal to computer[r].pq.a_i
-            #sum_v = reduce(add, [comp.pq.v[r+1] for comp in self.nodes])
-            #if not sum_v == self.nodes[r+1].pq.a_i:
-            #    raise RuntimeError("sum_v did not equal self.nodes[r+1].pq.a_i")
-        p = mod(reduce(add, [comp.bgw.n_j for comp in self.nodes]), M)
+        if debug:
+            p = mod(reduce(add, [comp.bgw.n_j for comp in self.nodes]), M)
+            print "p == a", p == a
 
     '''
     Choose the public exponent and the generator randomly.
@@ -378,7 +375,6 @@ class Computer:
         self.pq.a_i = get_relatively_prime_int_small(M)
         if GCD(self.pq.a_i, M) != 1:
             raise RuntimeError("The impossible has happened.")
-        print "a_i computer: ", self.id, self.pq.a_i
         # Set the first (zeroeth) value in u and v.
         # Since this is the first round, the first (zeroeth) computer sets u[round] = a_i
         # but all the other computers set everything to 0

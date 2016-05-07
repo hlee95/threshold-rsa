@@ -445,7 +445,11 @@ class Computer:
         for h in xrange(n):
             if h != self.id:
                 # Don't use mpz because mpz doesn't play nice with floats
-                n_j *= (h*1.0 + 1) / (h - self.id)
+                n_j = multiply(n_j,h + 1)
+        for h in xrange(n):
+            if h != self.id:
+                # Don't use mpz because mpz doesn't play nice with floats
+                n_j = divide(n_j,h - self.id)
 
         self.bgw.n_j = mod(n_j, self.bgw.M)
 

@@ -318,6 +318,10 @@ class Computer:
         # to check if N is the product of two primes
         self.v = [0]*n
 
+        # for primality testing, each node has a list of prime
+        primes = get_primes_in_range(B1,B2)
+        self.primes = [primes[i] for i in xrange(len(primes)) if i%(self.id+1)==0]
+
         # Variables for the dealing algorithm
         self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
         self.a_i_j = []
@@ -478,13 +482,11 @@ class Computer:
             self.pq.v.append(0)
 
     # check for small factors of N
-    def trial_division(self):
+    def trial_division(self,debug = False):
         N = self.N
-        primes = get_primes_in_range(B1,B2)
-        for prime in primes:
-            if (prime%n)==self.id:
-                if N%prime==0:
-                    return False
+        for prime in self.primes:
+            if N%prime==0:
+                return False
         return True
 
     # check if N is prime

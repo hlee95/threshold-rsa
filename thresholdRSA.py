@@ -66,7 +66,7 @@ class Network:
     Generate N, and verify that it is the product of two primes.
     At the end of this function, every computer will know N,
     '''
-    def generate_N(self):
+    def generate_N(self, debug=False):
         print "generate N"
         # Note this is a local M not the global M
         # This M is the product of all primes in the range (n, B1]
@@ -81,11 +81,14 @@ class Network:
         #print "calculating p_i"
         # First generate p_i
         self.generate_pq(M)
+
+        # for hanna_generate_pq_test
+        if debug:
+            return
+
         # At this point the last value that we put as n_j should be p_i
         for computer in self.nodes:
             computer.p_i = computer.bgw.n_j
-
-        return
 
         #print "calculating q_i"
         # Then generate q_i using the same method.
@@ -111,7 +114,7 @@ class Network:
         N = mod(sum(map(lambda comp: comp.bgw.n_j, self.nodes)), M)
         for computer in self.nodes:
             computer.N = N
-        #print "N: ", N # remove after debugging
+        #print "N: ", N
 
     def verify_N(self):
         p = sum(map(lambda comp: comp.p_i, self.nodes))
@@ -157,53 +160,40 @@ class Network:
     def generate_pq(self, M):
         for computer in self.nodes:
             computer.generate_pq_setup(M)
-        print "M", M
-        print "l", self.nodes[0].pq.l
+        # print "M", M
+        # print "l", self.nodes[0].pq.l
         # check to make sure stuff makes sense
         # gcd(a, M) should be 1
-        a = reduce(multiply, [comp.pq.a_i for comp in self.nodes])
-        print "a: ", a
-        print "a mod M: ", mod(a, M)
+        a = mod(reduce(multiply, [comp.pq.a_i for comp in self.nodes]), M)
+        # print "a: ", a
+        # print "a mod M: ", mod(a, M)
         if GCD(a, M) != 1:
             raise RuntimeError("gcd(a, M) is not 1 in generate_pq")
 
         while self.nodes[0].pq.round < n: # round is initialized as 0 for every computer, and updated for every computer at the same time
             r = self.nodes[0].pq.round
-            #print r
             for computer in self.nodes:
                 if len(computer.pq.u) != r+1 or len(computer.pq.v) != r+1:
                     raise RuntimeError("Wrong length for u or v, computer ", computer.id)
-            # print u and v
-            if False:
-                print "printing u and v"
-                print "-----------------"
-                for computer in self.nodes:
-                    print computer.pq.u
-                print "v----------------"
-                for computer in self.nodes:
-                    print computer.pq.v
             for computer in self.nodes:
-                print "computer:", computer.id
-                print "u[r]:", computer.pq.u[r]
-                print "v[r]:", computer.pq.v[r]
                 computer.one_round_BGW_phase_0(M, computer.pq.u[r], computer.pq.v[r], computer.pq.l)
             for computer in self.nodes:
                 computer.one_round_BGW_phase_1()
             for computer in self.nodes:
                 computer.one_round_BGW_phase_2()
             # test
-            product = reduce(multiply, [self.nodes[i].pq.a_i for i in xrange(r+1)])
-            current_sum = reduce(add, [comp.bgw.n_j for comp in self.nodes])
+            product = mod(reduce(multiply, [self.nodes[i].pq.a_i for i in xrange(r+1)]), M)
+            current_sum = mod(reduce(add, [comp.bgw.n_j for comp in self.nodes]), M)
             sum_mod = mod(current_sum, M)
-            print "product == current_sum", product == current_sum
-            print "product == sum_mod", product == sum_mod
-            if product != current_sum:
-                print "product", product
-                print "current_sum", current_sum
-                print "sum_mod", sum_mod
+            if product != sum_mod:
+                raise RuntimeError("product of a_i so far not equal to sum of the latest bgw shares")
             for computer in self.nodes:
                 computer.generate_pq_update()
-
+            # check that the sum of everyone's v is equal to computer[r].pq.a_i
+            #sum_v = reduce(add, [comp.pq.v[r+1] for comp in self.nodes])
+            #if not sum_v == self.nodes[r+1].pq.a_i:
+            #    raise RuntimeError("sum_v did not equal self.nodes[r+1].pq.a_i")
+        p = mod(reduce(add, [comp.bgw.n_j for comp in self.nodes]), M)
 
     '''
     Choose the public exponent and the generator randomly.
@@ -388,7 +378,7 @@ class Computer:
         self.pq.a_i = get_relatively_prime_int_small(M)
         if GCD(self.pq.a_i, M) != 1:
             raise RuntimeError("The impossible has happened.")
-        #print "a_i computer: ", self.id, self.pq.a_i
+        print "a_i computer: ", self.id, self.pq.a_i
         # Set the first (zeroeth) value in u and v.
         # Since this is the first round, the first (zeroeth) computer sets u[round] = a_i
         # but all the other computers set everything to 0

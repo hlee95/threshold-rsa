@@ -31,7 +31,7 @@ def brian_parallel_trial_division():
 #brian_parallel_trial_division()
 
 def brian_primality_test():
-    network = Network() 
+    network = Network()
     product_prime_test = False
     while not product_prime_test:
         network.generate_N()
@@ -97,22 +97,19 @@ def hanna_bgw_test():
         for computer in network.nodes:
             computer.one_round_BGW_phase_2()
 
-        test_5N = 0
+        test_N = 0
         for computer in network.nodes:
             test_N = add(test_N, computer.bgw.n_j)
             #print "n_j: ", computer.bgw.n_j
         test_N = mod(test_N, M)
         #print "test_N: ", test_N
         print test_N == real_N
-        return 
+        return
     print trues
 
 def hanna_generate_pq_test():
     network = Network([])
     network.generate_N()
-    p = sum([comp.p_i for comp in network.nodes])
-    print "p: ", p
-    print gmpy2.is_prime(p)
 
 def hao_signing_test():
     print "---------------------------------------"

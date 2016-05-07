@@ -31,12 +31,25 @@ def brian_parallel_trial_division():
 #brian_parallel_trial_division()
 
 def brian_primality_test():
-    network = Network()
-    network.setup()
-    print "should be false"
-    print network.load_balance_primality_test()
-    print "should be true"
-    print network.load_balance_primality_test()
+    network = Network() 
+    product_prime_test = False
+    while not product_prime_test:
+        network.generate_N()
+        p = 1
+        q = 1
+        for computer in network.nodes:
+            p=multiply(p,computer.p_i)
+            q=multiply(q,computer.q_i)
+        print "N=?p*q",network.nodes[0].N==p*q
+        if not network.nodes[0].N==p*q:
+            continue
+        #print "end digits of N",network.nodes[0].N %1000000000000000000000
+        #print "N is",len(str(network.nodes[0].N)),"digits long"
+        trial = network.parallel_trial_division()
+        if trial:
+            product_prime_test = network.load_balance_primality_test()
+    print "found a good N"
+
 #brian_primality_test()
 
 
@@ -69,14 +82,14 @@ def hanna_bgw_test():
     trues = []
     for i in xrange(10):
         M = get_random_prime(10*1024,10**1025)
-        #M = 102277922045560377677425330733025540787828481406916984309906917658679563028615294226321554724723272942310661725952704155095478409778315613883726668677544055422016936511783428122218075870314606203578763039546078374498114291572003824750681852245916170997581540628197467671968077726679505726524448218294989785311398744742887714607819190071055856821147699026221351085249350463784780552304793306340277073393234968722571984036002634583
-        print "M: ", M
-        p = [get_relatively_prime_int_small(M), 0, 0, 0, 0]
-        print "p: ", p[0]
-        print "GCD(p, M): ", GCD(M, p[0])
+        M = 102277922045560377677425330733025540787828481406916984309906917658679563028615294226321554724723272942310661725952704155095478409778315613883726668677544055422016936511783428122218075870314606203578763039546078374498114291572003824750681852245916170997581540628197467671968077726679505726524448218294989785311398744742887714607819190071055856821147699026221351085249350463784780552304793306340277073393234968722571984036002634583
+        #print "M: ", M
+        p = [5460464438021977804057236809255745983655654639488943338399529401187960087728442365076334904063540375501076768237258407429448912087148532210127353706664952031768178921898761017501739703326762702046047359203257596899, 0, 0, 0, 0]
+        #print "p: ", p[0]
+        #print "GCD(p, M): ", GCD(M, p[0])
         q = [1, 0, 0, 0, 0]
         real_N = multiply(reduce(add, p), reduce(add, q))
-        print "real_N: ", real_N
+        #print "real_N: ", real_N
         for i in xrange(5):
             network.nodes[i].one_round_BGW_phase_0(M, p[i], q[i], 2)
         for computer in network.nodes:
@@ -84,20 +97,22 @@ def hanna_bgw_test():
         for computer in network.nodes:
             computer.one_round_BGW_phase_2()
 
-        test_N = 0
+        test_5N = 0
         for computer in network.nodes:
             test_N = add(test_N, computer.bgw.n_j)
-            print "n_j: ", computer.bgw.n_j
+            #print "n_j: ", computer.bgw.n_j
         test_N = mod(test_N, M)
-        print "test_N: ", test_N
-        trues.append(test_N == real_N)
+        #print "test_N: ", test_N
+        print test_N == real_N
+        return 
     print trues
 
 def hanna_generate_pq_test():
     network = Network([])
     network.generate_N()
-    a_0 = sum([comp.bgw.n_j for comp in network.nodes])
-    print "a_0: ", a_0
+    p = sum([comp.p_i for comp in network.nodes])
+    print "p: ", p
+    print gmpy2.is_prime(p)
 
 def hao_signing_test():
     print "---------------------------------------"
@@ -138,8 +153,8 @@ def hao_key_generation_test():
 
 def run_all_tests():
     #hanna_subset_presigning_test()
-    hanna_bgw_test()
-    #hanna_generate_pq_test()
+    #hanna_bgw_test()
+    hanna_generate_pq_test()
     #hao_signing_test()
     #brian_dealing_tests()
     #hao_key_generation_test()

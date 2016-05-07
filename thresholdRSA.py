@@ -12,7 +12,7 @@ k = 4
 # B1 is the bound used in 5.2.1 distributed sieving method, TODO not exactly sure how to compute
 B1 = 1 << 10
 # B2 is the bound used in 5.2.3
-B2 = 2**19 #we need this to be lower than our list of primes
+B2 = 2**29 #we need this to be lower than our list of primes
 
 # N = public modulus
 # for now lets just make the the product of 2 large random primes
@@ -73,12 +73,12 @@ class Network:
 
         M = reduce(multiply, get_primes_in_range(n + 1, B1))
 
-        print "M: ", M
+        #print "M: ", M
 
         for computer in self.nodes:
             computer.M = M
 
-        print "calculating p_i"
+        #print "calculating p_i"
         # First generate p_i
         self.generate_pq(M)
         # At this point the last value that we put as n_j should be p_i
@@ -87,7 +87,7 @@ class Network:
 
         return
 
-        print "calculating q_i"
+        #print "calculating q_i"
         # Then generate q_i using the same method.
         self.generate_pq(M)
         for computer in self.nodes:
@@ -98,7 +98,7 @@ class Network:
         for computer in self.nodes:
             computer.M = M
 
-        print "calcalating N"
+        #print "calcalating N"
         # Compute N using BGW since now every computer has its own p_i and q_i
         for computer in self.nodes:
             computer.one_round_BGW_phase_0(M, computer.p_i, computer.q_i, computer.pq.l)
@@ -111,7 +111,7 @@ class Network:
         N = mod(sum(map(lambda comp: comp.bgw.n_j, self.nodes)), M)
         for computer in self.nodes:
             computer.N = N
-        print "N: ", N # remove after debugging
+        #print "N: ", N # remove after debugging
 
     def verify_N(self):
         p = sum(map(lambda comp: comp.p_i, self.nodes))
@@ -123,7 +123,7 @@ class Network:
         if mod(test_N, self.nodes[0].M) != self.nodes[0].N:
             raise RuntimeError("verification of N failed.")
 
-        return True # TODO Brian's code here
+        return True
 
     # each computer tries and checks if the N they all have is divisible by any small number
     def parallel_trial_division(self):
@@ -134,9 +134,8 @@ class Network:
         return True
 
     # check if N is prime:
-    def load_balance_primality_test(self,N):
-        #N = self.N
-        N - self.nodes[0].N
+    def load_balance_primality_test(self):
+        N = self.nodes[0].N
         for computer in self.nodes:
             if N!= computer.N:
                 raise RuntimeError("Not all computers had the same N")
@@ -158,6 +157,8 @@ class Network:
     def generate_pq(self, M):
         for computer in self.nodes:
             computer.generate_pq_setup(M)
+        print "M", M
+        print "l", self.nodes[0].pq.l
         # check to make sure stuff makes sense
         # gcd(a, M) should be 1
         a = reduce(multiply, [comp.pq.a_i for comp in self.nodes])
@@ -166,18 +167,40 @@ class Network:
         if GCD(a, M) != 1:
             raise RuntimeError("gcd(a, M) is not 1 in generate_pq")
 
-        while self.nodes[0].pq.round < 1: # round is initialized as 0 for every computer, and updated for every computer at the same time
+        while self.nodes[0].pq.round < n: # round is initialized as 0 for every computer, and updated for every computer at the same time
             r = self.nodes[0].pq.round
-            print r
+            #print r
             for computer in self.nodes:
                 if len(computer.pq.u) != r+1 or len(computer.pq.v) != r+1:
                     raise RuntimeError("Wrong length for u or v, computer ", computer.id)
+            # print u and v
+            if False:
+                print "printing u and v"
+                print "-----------------"
+                for computer in self.nodes:
+                    print computer.pq.u
+                print "v----------------"
+                for computer in self.nodes:
+                    print computer.pq.v
             for computer in self.nodes:
+                print "computer:", computer.id
+                print "u[r]:", computer.pq.u[r]
+                print "v[r]:", computer.pq.v[r]
                 computer.one_round_BGW_phase_0(M, computer.pq.u[r], computer.pq.v[r], computer.pq.l)
             for computer in self.nodes:
                 computer.one_round_BGW_phase_1()
             for computer in self.nodes:
                 computer.one_round_BGW_phase_2()
+            # test
+            product = reduce(multiply, [self.nodes[i].pq.a_i for i in xrange(r+1)])
+            current_sum = reduce(add, [comp.bgw.n_j for comp in self.nodes])
+            sum_mod = mod(current_sum, M)
+            print "product == current_sum", product == current_sum
+            print "product == sum_mod", product == sum_mod
+            if product != current_sum:
+                print "product", product
+                print "current_sum", current_sum
+                print "sum_mod", sum_mod
             for computer in self.nodes:
                 computer.generate_pq_update()
 
@@ -360,12 +383,12 @@ class Computer:
     '''
     def generate_pq_setup(self, M):
         # Initialize PQData with round = 0, M = M, l = floor((n-1)/2)
-        self.pq = PQData(0, M, int(math.floor((n-1/2))))
+        self.pq = PQData(0, M, int(math.floor((n-1)/2)))
         # Let a_i be some random integer relatively prime to M
         self.pq.a_i = get_relatively_prime_int_small(M)
         if GCD(self.pq.a_i, M) != 1:
             raise RuntimeError("The impossible has happened.")
-        print "a_i computer: ", self.id, self.pq.a_i
+        #print "a_i computer: ", self.id, self.pq.a_i
         # Set the first (zeroeth) value in u and v.
         # Since this is the first round, the first (zeroeth) computer sets u[round] = a_i
         # but all the other computers set everything to 0
@@ -463,7 +486,7 @@ class Computer:
         self.pq.round += 1
         # Set the next value in self.pq.v depending on if it's our turn or not.
         if self.id == self.pq.round:
-            print "updated!"
+            #print "updated!"
             self.pq.v.append(self.pq.a_i)
         else:
             self.pq.v.append(0)

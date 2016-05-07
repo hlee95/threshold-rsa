@@ -15,7 +15,7 @@ import sys
 Returns a random prime number in the range [start, end)
 '''
 
-primes = cPickle.load(open("picklePrimesSmall.pkl","r"))
+primes = cPickle.load(open("picklePrimes.pkl","r"))
 
 def get_random_prime(start,end):
     i = random.randint(start,end) # better random nunber generator

@@ -35,20 +35,26 @@ def brian_primality_test():
     product_prime_test = False
     counter = 0
     while not product_prime_test:
-        print counter
+        if counter %100==0:
+            print counter
         counter+=1
-        network.generate_N()
-        """
+        network.generate_N(fake=True)
         M = network.nodes[0].M
         N = mod(network.nodes[0].N,M)
         p = 0
         q = 0
         for computer in network.nodes:
             p=add(p,computer.p_i)
+        if not gmpy2.is_prime(p):
+            #print "p not prime"
+            continue
+        for computer in network.nodes:
             q=add(q,computer.q_i)
-        if N!=mod(p*q,M):
-            raise RuntimeError(" N!=mod(p*q,M)")
-        """
+        if not gmpy2.is_prime(q):
+            print "q not prime"
+            continue
+        if N!=p*q:
+            raise RuntimeError(" N!=p*q,M")
         trial = network.parallel_trial_division()
         if trial:
             product_prime_test = network.load_balance_primality_test()

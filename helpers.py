@@ -15,7 +15,7 @@ import sys
 Returns a random prime number in the range [start, end)
 '''
 
-primes = cPickle.load(open("picklePrimes.pkl","r"))
+primes = cPickle.load(open("picklePrimesSmall.pkl","r"))
 
 def get_random_prime(start,end):
     i = random.randint(start,end) # better random nunber generator
@@ -52,6 +52,17 @@ def get_relatively_prime_int_small(n):
 
 def GCD(a, b):
     return gmpy2.gcd(gmpy2.mpz(a), gmpy2.mpz(b))
+
+
+def getShares(p,n,M):
+    base = p/n
+    shares = [0]*n
+    for i in range(n-1):
+        shares[i]= random.randint(3,2**1023)
+    rest = sum(shares)%M
+    shares[-1] = p-rest
+    return shares
+        
 
 '''
 Returns a random integer between 0 and n-1.

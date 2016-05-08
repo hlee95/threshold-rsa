@@ -10,9 +10,9 @@ k = 4
 # e = the public key
 # e = 1 # TODO compute this
 # B1 is the bound used in 5.2.1 distributed sieving method, TODO not exactly sure how to compute
-B1 = 1 << 10
+B1 = 1 << 15
 # B2 is the bound used in 5.2.3
-B2 = 2**29 #we need this to be lower than our list of primes
+B2 = 2**19 #we need this to be lower than our list of primes
 
 # N = public modulus
 # for now lets just make the the product of 2 large random primes
@@ -66,8 +66,8 @@ class Network:
     Generate N, and verify that it is the product of two primes.
     At the end of this function, every computer will know N,
     '''
-    def generate_N(self, debug=False):
-        print "generate N"
+    def generate_N(self, fake = False, debug=False):
+        #print "generate N"
         # Note this is a local M not the global M
         # This M is the product of all primes in the range (n, B1]
 
@@ -77,7 +77,19 @@ class Network:
 
         for computer in self.nodes:
             computer.M = M
-
+        if fake:
+            p = get_random_prime(2**1024,2**1025)
+            q = get_random_prime(2**1024,2**1025)
+            N = p*q
+            shares_p_i = getShares(p,n,M)
+            shares_q_i = getShares(q,n,M)
+            for i in range(len(self.nodes)):
+                self.nodes[i].p_i = shares_p_i[i]
+                self.nodes[i].q_i = shares_q_i[i]
+                self.nodes[i].N = N
+            return
+                
+            
         #print "calculating p_i"
         # First generate p_i
         self.generate_pq(M, debug)
@@ -320,7 +332,8 @@ class Computer:
 
         # for primality testing, each node has a list of prime
         primes = get_primes_in_range(B1,B2)
-        self.primes = [primes[i] for i in xrange(len(primes)) if i%(self.id+1)==0]
+        
+        self.primes = [primes[i] for i in xrange(len(primes)) if i%n==self.id]
 
         # Variables for the dealing algorithm
         self.f_i_j = [1] * n # array that stores f_i_j for each i in range 0...n-1 (j is self)
@@ -486,6 +499,10 @@ class Computer:
         N = self.N
         for prime in self.primes:
             if N%prime==0:
+                print "N=prime*x"
+                print "N",N
+                print "prime",prime
+                print "x",N/prime
                 return False
         return True
 

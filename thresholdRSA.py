@@ -2,9 +2,9 @@ from helpers import *
 
 # global variables
 # n = number of computers in the network
-n = 5
+n = 10
 # k = number of people who have to agree
-k = 4
+k = 6
 # g is an agreed upon element in Z*_n that has high order
 # g = 101 # TODO compute this
 # e = the public key
@@ -51,7 +51,7 @@ class Network:
     def setup(self):
         print "network setup"
         # first, choose N and e, and distribute d_i to everyone
-        self.generate_N() # generate public RSA modulus N, and large M
+        self.generate_N(fake=True) # generate public RSA modulus N, and large M
         while not self.verify_N():
             self.generate_N()
         self.choose_e_and_g() # choose the public encryption key e and generator g
@@ -61,6 +61,7 @@ class Network:
 
         # then, run the dealing algorithm
         self.dealing_algorithm()
+        print "done setup"
 
     '''
     Generate N, and verify that it is the product of two primes.
@@ -129,16 +130,9 @@ class Network:
         #print "N: ", N
 
     def verify_N(self):
-        p = sum(map(lambda comp: comp.p_i, self.nodes))
-        print "p: ", p
-        q = sum(map(lambda comp: comp.q_i, self.nodes))
-        print "q: ", q
-        test_N = multiply(p, q)
-        print test_N
-        if mod(test_N, self.nodes[0].M) != self.nodes[0].N:
-            raise RuntimeError("verification of N failed.")
-
-        return True
+        if self.parallel_trial_division():
+            return self.load_balance_primality_test()
+        return False
 
     # each computer tries and checks if the N they all have is divisible by any small number
     def parallel_trial_division(self):
@@ -892,7 +886,7 @@ class Computer:
             computer.receive_sum_phi_j(self.id, sum_phi_j)
 
     def generate_phi_and_psi(self,):
-        self.sum_phi = sum(self.sum_phi_i_j)
+        self.sum_phi = reduce(add,self.sum_phi_i_j)
         self.psi = mod(self.sum_phi, self.e)
         self.psi_inv = powmod(self.psi, -1, self.e)
 

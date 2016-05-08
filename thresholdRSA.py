@@ -89,8 +89,8 @@ class Network:
                 self.nodes[i].q_i = shares_q_i[i]
                 self.nodes[i].N = N
             return
-                
-            
+
+
         #print "calculating p_i"
         # First generate p_i
         self.generate_pq(M, debug)
@@ -326,7 +326,7 @@ class Computer:
 
         # for primality testing, each node has a list of prime
         primes = get_primes_in_range(B1,B2)
-        
+
         self.primes = [primes[i] for i in xrange(len(primes)) if i%n==self.id]
 
         # Variables for the dealing algorithm
@@ -684,7 +684,8 @@ class Computer:
         for computer in self.I:
             if computer.id == self.id:
                 continue
-            lambda_t_i *= (computer.id + 1)/(computer.id - self.id) # We need the "+1" because otherwise we could get 0
+            lambda_t_i = multiply(lambda_t_i, computer.id + 1)
+            lambda_t_i = divide(lambda_t_i, computer.id - self.id) # We need the "+1" because otherwise we could get 0
             lambda_t_i = mod(lambda_t_i, self.M)
         self.presigning_data[self.I].lambda_t_i = lambda_t_i
 

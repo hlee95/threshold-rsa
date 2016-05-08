@@ -4,7 +4,7 @@ from helpers import *
 # n = number of computers in the network
 n = 10
 # k = number of people who have to agree
-k = 6
+k = 4
 # g is an agreed upon element in Z*_n that has high order
 # g = 101 # TODO compute this
 # e = the public key
@@ -224,11 +224,11 @@ class Network:
     def dealing_algorithm(self):
         for user in self.nodes:
             #calculation phase
-            user.dealing_phase_1(self.nodes[0].M,k,self.nodes[0].g,self.nodes)
+            user.dealing_phase_1()
         for user in self.nodes:
             #print "user id = ",user.id+1
             #verfication phase
-            if not user.dealing_phase_2(self.nodes[0].M,k,self.nodes[0].g,self.nodes):
+            if not user.dealing_phase_2():
                 print "aborted, user",user.id+1,", found an error"
                 return False
         return True
@@ -543,7 +543,10 @@ class Computer:
     # at this point each party j has recieved f_{1,j},...,f_{n,j} and verifies
     # # # g^{f_{i,j}} = g^{f_i(j)} mod N = g^{a_{1,k-1}j^{k-1}+...+a_{i,1}j+d_i}
     # # #             =
-    def dealing_phase_1(self,M,k,g,S):
+    def dealing_phase_1(self):
+        M = self.M
+        g = self.g
+        S = self.network.nodes
         #print "user",self.id+1
         selfid = self.id+1
         # pick the random polynomial
@@ -567,7 +570,10 @@ class Computer:
                 user.b_i_j[self.id][j]=powmod(g,self.a_i_j[j],self.N)
             #print "the bs for user",user.id+1,"is",user.b_i_j[self.id]
 
-    def dealing_phase_2(self,M,k,g,S):
+    def dealing_phase_2(self):
+        M = self.M
+        g = self.g
+        S = self.network.nodes
         # check to ensure people sent out the correct values
         selfid = self.id+1
         for user_i in S:

@@ -79,8 +79,8 @@ class Network:
         for computer in self.nodes:
             computer.M = M
         if fake:
-            p = get_random_prime(2**1024,2**1025)
-            q = get_random_prime(2**1024,2**1025)
+            p = get_random_prime(2**10,2**11)
+            q = get_random_prime(2**10,2**11)
             N = p*q
             shares_p_i = getShares(p,n,M)
             shares_q_i = getShares(q,n,M)
@@ -293,6 +293,8 @@ class Network:
             t_i.subset_presigning_algorithm_phase_4()
 
     def private_key_generation(self,):
+        print 'private key gen nodes'
+
         for user in self.nodes:
             user.create_phi_i()
             user.distribute_phi_i_j()
@@ -300,8 +302,24 @@ class Network:
             user.distribute_sum_phi_j()
         for user in self.nodes:
             user.generate_phi_and_psi()
+    
+        #for checks         
+        phisum = 0
+        for user in self.nodes:
+            phisum = add(phisum,user.phi_i)
+        for user in self.nodes:
+            assert 0 == mod(subtract(user.psi,phisum),user.e)    
+            
         for user in self.nodes:
             user.generate_d_i()
+
+        # trial decryption 5.2.6
+        message = 1234567
+        for user in self.nodes:
+            user.generate_message_i(message)        
+        
+        # user 1 computes product
+        self.nodes[0].process_messages(message)
 
 class Computer:
     def __init__(self, network, _id, agree):
@@ -342,6 +360,7 @@ class Computer:
         self.phi = None #phi(n)
         self.psi = None #phi(n) mod e
         self.psi_inv = None #psi inv mod e
+        self.message_i = [0]*n # for trial decryption 5.2.6
         # Variables set at the end of the dealing algorithm
         self.S = {} #{k,M,g}
         self.P_i = [] # {{b_j,l}_j=1,...,n,l=0,...,k-1}
@@ -710,6 +729,19 @@ class Computer:
     '''
     def subset_presigning_algorithm_phase_2(self):
         # Compute and broadcast the signature share.
+        print 'check i'
+        isum = 0
+        dsum = 0
+        for computer in self.I:
+            isum = add(isum, computer.presigning_data[self.I].S_I_t_i)
+            dsum = add(dsum, computer.d_i)
+        print 'i prime'
+        isum2 = 0
+        for computer in self.I_prime:
+            dsum = add(dsum, computer.d_i)
+            isum2 = add(isum, computer.d_i)
+        print mod(subtract(isum, isum2),self.M)
+        print 'check ed', powmod(2,multiply(self.e, dsum), self.N)
         signature_share = self.signature_share_generation(self.dummy_message)
 
     '''
@@ -736,6 +768,8 @@ class Computer:
         product_c_prime_t_i = mod(reduce(multiply,
             map(lambda sigma: sigma[0],
                 self.sigmas)), self.N)
+        print 'sigmas', map(lambda sigma: sigma[0],self.sigmas)
+        print 'product', product_c_prime_t_i
         # Calculate 2^(e*M) % N
         two_e_M = powmod(2, multiply(self.e, self.M), self.N)
         # Search for the value of x_I that makes the product = 2 * (2^(e*M*x_I))
@@ -794,11 +828,11 @@ class Computer:
     ###############################################################
 
     '''
-    Receives a tuple (id, sigma) from another computer
+    Receives a sigma from another computer
     and saves it in self.sigmas
     '''
-    def receive_sigma(self, id_and_sigma):
-        self.sigmas.append(id_and_sigma)
+    def receive_sigma(self, sigma):
+        self.sigmas.append(sigma)
 
     '''
     Given a message and the relevant set of k parties,
@@ -819,12 +853,13 @@ class Computer:
         r= s+c*(s_i+d_i)
         m_s = powmod(m, s, self.N)
         g_s = powmod(self.g, s, self.N)
-        proof = [(g_s, m_s), c_i, r, c] #
-        sigma = (m, proof) #TODO: actually calculate sigma = (signature, proof)
-
+        proof = [m, (g_s, m_s), c_i, r, c, self.id] #
+        sigma = (c_i, proof) #TODO: actually calculate sigma = (signature, proof)
+        print 'Is'
         # TODO broadcast the tuple (self.id, sigma) to other parties
         for computer in self.I:
-            computer.receive_sigma((self.id, sigma))
+            print computer
+            computer.receive_sigma(sigma)
         # Return sigma
         return sigma
 
@@ -834,9 +869,9 @@ class Computer:
     '''
     def signature_share_verification(self):
         print 'verifying'
-        for (s_id, sigma) in self.sigmas:
-            (m, proof) = sigma
-            [(g_s, m_s), c_i, r, c] = proof
+        for sigma in self.sigmas:
+            (c_i, proof) = sigma
+            [m, (g_s, m_s), c_i, r, c, s_id] = proof
             b_ti0 = self.b_i_j[s_id][0]
             h_ti = self.presigning_data[self.I].received_h_t_i[s_id]
             if powmod(self.g, r, self.N) != mod(g_s*powmod(b_ti0*h_ti, c, self.N), self.N):
@@ -875,6 +910,9 @@ class Computer:
     def receive_sum_phi_j(self, from_id, sum_phi_j):
         self.sum_phi_i_j[from_id] = sum_phi_j #sum of all phi_i_j of party j, set by recieving from party j, every party will eventually have the same list
 
+    def receive_message_i(self, from_id, message):
+        self.message_i[from_id] = message
+        
     def create_phi_i(self,):
         #step 1
         self.phi_i =-(self.p_i+self.q_i)
@@ -882,17 +920,19 @@ class Computer:
             self.phi_i = self.N + self.phi_i + 1
 
     def distribute_phi_i_j(self,):
-        phi_i_j = sum_genereator(self.phi_i, n, self.N)
+        phi_i_j = sum_genereator(self.phi_i, 10, self.e)
+        assert mod(reduce(add, phi_i_j), self.e) == mod(self.phi_i,self.e)
         for computer in self.network.nodes:
             computer.receive_phi(self.id, phi_i_j[computer.id])
 
     def distribute_sum_phi_j(self,):
         #Calculates sum of phi_i_j and distributes it to everyone
-        sum_phi_j = sum(self.phi_i_j)
+        sum_phi_j = reduce(add,self.phi_i_j)
         for computer in self.network.nodes:
             computer.receive_sum_phi_j(self.id, sum_phi_j)
 
     def generate_phi_and_psi(self,):
+        #print self.sum_phi_i_j
         self.sum_phi = reduce(add,self.sum_phi_i_j)
         self.psi = mod(self.sum_phi, self.e)
         self.psi_inv = powmod(self.psi, -1, self.e)
@@ -901,3 +941,21 @@ class Computer:
         self.d_i = divide(-self.phi_i*self.psi_inv, self.e)
         if self.id == 1:
             self.d_i = divide(1-self.phi_i*self.psi_inv, self.e)
+    
+    def generate_message_i(self,message):
+        self.network.nodes[0].receive_message_i(self.id, powmod(message,self.d_i*self.e,self.N))                            
+
+    #message is the message to compare to
+    def process_messages(self,message):
+        m_prime = mod(reduce(multiply,self.message_i), self.N)
+        correct = n
+        for i in range(n):
+            if mod(message, self.N) == mod(multiply(m_prime, powmod(message, i*self.e, self.N)),self.N):
+                correct = i
+                break
+        assert correct != n
+        self.d_i +=correct
+        
+
+    def __str__(self):
+        return "Computer "+str(self.id)

@@ -64,7 +64,7 @@ def brian_primality_test():
         print "p_i",computer.p_i
         print "q_i",computer.q_i
     print "found a good N"
-brian_primality_test()
+#brian_primality_test()
 
 
 
@@ -137,7 +137,6 @@ def hao_signing_test():
     print "---------------------------------------"
     network = Network(range(4, 7))
     network.setup()
-    network.dealing_algorithm()
 
     print "Try with 3 people."
     network.sign(100)
@@ -165,14 +164,24 @@ def hao_key_generation_test():
     print "SUBSET PRESIGNING TEST"
     print "---------------------------------------"
     network = Network(range(4, 7))
-    network.private_key_generation()
+    network.setup()
+    d_sum = 0
+    e = 0
+    n = 0
+    for computer in network.nodes:
+        d_sum = add(d_sum, computer.d_i)
+        e = computer.e
+        n = computer.N
+
+    assert 2 == powmod(2,e*d_sum, n)
 
 
 def run_all_tests():
     #hanna_subset_presigning_test()
     #hanna_bgw_test()
-    hanna_generate_pq_test()
-    #hao_signing_test()
+    #hanna_generate_pq_test()
+    hao_signing_test()
+    #hao_key_generation_test()
     #brian_dealing_tests()
     #hao_key_generation_test()
     print "---------------------------------------"
@@ -180,6 +189,6 @@ def run_all_tests():
     print "---------------------------------------"
 
 # Run everything!
-#run_all_tests()
+run_all_tests()
 
 

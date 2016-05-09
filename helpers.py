@@ -118,7 +118,7 @@ def mod(x, m):
         remainder = gmpy2.add(remainder, m)
     return remainder
 
-#[d_1, d_2...d_n] such that sum [] = d
+#[d_1, d_2...d_n] such that sum [] = d mod N
 def sum_genereator(d, n, N):
     d_i = []
     #choose random values for first n-1
@@ -126,7 +126,8 @@ def sum_genereator(d, n, N):
         d_i.append(get_random_int(N))
 
     #last one must make sum to d
-    d_i.append(mod(-sum(d_i), N))
+    d_i.append(mod(subtract(d,1*reduce(add,d_i)), N))
+    assert mod(reduce(add, d_i), N) == mod(d,N)
     return d_i
 
 #########################################

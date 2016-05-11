@@ -60,7 +60,9 @@ class Network:
         self.private_key_generation()
 
         # then, run the dealing algorithm
-        self.dealing_algorithm()
+        deal = self.dealing_algorithm()
+        if not deal:
+            raise RuntimeError("user found an issue in the deals")
         print "done setup"
 
     '''
@@ -79,8 +81,15 @@ class Network:
         for computer in self.nodes:
             computer.M = M
         if fake:
-            p = get_random_prime(2**10,2**11)
-            q = get_random_prime(2**10,2**11)
+            # Now, M is a large prime, larger than N
+            M = get_random_prime(1 << 2050, 1 << 2051)
+            for computer in self.nodes:
+                computer.M = M
+                assert gmpy2.is_prime(computer.M) == True
+
+
+            p = get_random_prime(2**1024,2**1025)
+            q = get_random_prime(2**1024,2**1025)
             N = p*q
             shares_p_i = getShares(p,n,M)
             shares_q_i = getShares(q,n,M)
@@ -113,6 +122,7 @@ class Network:
         M = get_random_prime(1 << 1024, 1 << 1025)
         for computer in self.nodes:
             computer.M = M
+            assert gmpy2.is_prime(computer.M) == True
 
         #print "calcalating N"
         # Compute N using BGW since now every computer has its own p_i and q_i
@@ -202,7 +212,7 @@ class Network:
     Choose the public exponent and the generator randomly.
     '''
     def choose_e_and_g(self):
-        e = get_relatively_prime_int(self.nodes[0].N)
+        e = 65537 #get_relatively_prime_int(self.nodes[0].N)
         g = get_random_int(self.nodes[0].N) # TODO: check this
         for computer in self.nodes:
             computer.e = e
@@ -461,9 +471,9 @@ class Computer:
         for computer in self.network.nodes:
             x = computer.id + 1 # the x value to evaluate the polynomial at
             x_j = map(lambda ex: powmod(x, ex + 1, self.bgw.M), range(2*self.bgw.l)) # calculate the relevant powers of x
-            f = mod(self.bgw.p_i + sum(map(lambda idx: mulmod(self.bgw.a[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
-            g = mod(self.bgw.q_i + sum(map(lambda idx: mulmod(self.bgw.b[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
-            h = mod(sum(map(lambda idx: mulmod(self.bgw.c[idx], x_j[idx], self.bgw.M), range(2*self.bgw.l))), self.bgw.M)
+            f = mod(self.bgw.p_i + reduce(add,map(lambda idx: mulmod(self.bgw.a[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
+            g = mod(self.bgw.q_i + reduce(add,map(lambda idx: mulmod(self.bgw.b[idx], x_j[idx], self.bgw.M), range(self.bgw.l))), self.bgw.M)
+            h = mod(reduce(add,map(lambda idx: mulmod(self.bgw.c[idx], x_j[idx], self.bgw.M), range(2*self.bgw.l))), self.bgw.M)
             computer.receive_fgh((f, g, h))
 
     '''
@@ -564,12 +574,14 @@ class Computer:
     # # #             =
     def dealing_phase_1(self):
         M = self.M
+        assert gmpy2.is_prime(M) == True
         g = self.g
         S = self.network.nodes
         #print "user",self.id+1
         selfid = self.id+1
         # pick the random polynomial
         self.a_i_j = [0]*k
+
         self.a_i_j[0] = self.d_i
         for i in xrange(1,k):
             self.a_i_j[i] = get_random_int(M)
@@ -704,13 +716,16 @@ class Computer:
             if computer.id == self.id:
                 continue
             lambda_t_i = multiply(lambda_t_i, computer.id + 1)
+        for computer in self.I:
+            if computer.id == self.id:
+                continue
             lambda_t_i = divide(lambda_t_i, computer.id - self.id) # We need the "+1" because otherwise we could get 0
-            lambda_t_i = mod(lambda_t_i, self.M)
+        lambda_t_i = mod(lambda_t_i, self.M)
         self.presigning_data[self.I].lambda_t_i = lambda_t_i
 
         # Compute s_t_i = (sum(f_i_j) * lambda_t_i) % M
         I_prime_ids = map(lambda computer: computer.id, self.I_prime)
-        s_t_i = multiply(sum([self.f_i_j[i] for i in I_prime_ids]), lambda_t_i) % self.M
+        s_t_i = mod(multiply(reduce(add, [self.f_i_j[i] for i in I_prime_ids]), lambda_t_i), self.M)
         self.presigning_data[self.I].s_t_i = s_t_i
         self.presigning_data[self.I].S_I_t_i = s_t_i
 
@@ -730,18 +745,30 @@ class Computer:
     def subset_presigning_algorithm_phase_2(self):
         # Compute and broadcast the signature share.
         print 'check i'
-        isum = 0
+        ssum = 0
         dsum = 0
         for computer in self.I:
-            isum = add(isum, computer.presigning_data[self.I].S_I_t_i)
+            ssum = add(ssum, computer.presigning_data[self.I].S_I_t_i)
+
+        intersum = 0
+        for computer1 in self.I:
+            for computer2 in self.I_prime:
+                intersum = add(intersum, multiply(computer1.f_i_j[computer2.id],computer1.presigning_data[self.I].lambda_t_i))                
+
+        bsum = 0
+        for computer1 in self.I:
+            bsum = add(bsum, multiply(computer1.f_i_j[self.id],computer1.presigning_data[self.I].lambda_t_i))                
+            
+        for computer in self.I_prime:    
             dsum = add(dsum, computer.d_i)
-        print 'i prime'
-        isum2 = 0
-        for computer in self.I_prime:
-            dsum = add(dsum, computer.d_i)
-            isum2 = add(isum, computer.d_i)
-        print mod(subtract(isum, isum2),self.M)
-        print 'check ed', powmod(2,multiply(self.e, dsum), self.N)
+                                    
+        print mod(mod(bsum,self.M),self.e)
+        print mod(mod(self.d_i,self.M),self.e)     
+        print mod(mod(intersum,self.M),self.e)
+        print mod(mod(ssum,self.M),self.e)
+        print mod(mod(dsum,self.M),self.e)
+        assert mod(subtract(ssum, dsum),self.M) == 0
+
         signature_share = self.signature_share_generation(self.dummy_message)
 
     '''
@@ -847,10 +874,10 @@ class Computer:
         s_i = self.presigning_data[self.I].S_I_t_i
         b_ti0 = self.b_i_j[self.id][0]
         h_ti = self.presigning_data[self.I].h_t_i
-        c_i = powmod(m, s_i+d_i, self.N)
+        c_i = powmod(m, add(s_i,d_i), self.N)
         s = get_random_int(self.N)
         c = get_random_int(self.N)
-        r= s+c*(s_i+d_i)
+        r= add(s,multiply(c,add(s_i,d_i)))
         m_s = powmod(m, s, self.N)
         g_s = powmod(self.g, s, self.N)
         proof = [m, (g_s, m_s), c_i, r, c, self.id] #
@@ -915,9 +942,9 @@ class Computer:
         
     def create_phi_i(self,):
         #step 1
-        self.phi_i =-(self.p_i+self.q_i)
+        self.phi_i =-add(self.p_i,self.q_i)
         if self.id == 1:
-            self.phi_i = self.N + self.phi_i + 1
+            self.phi_i = add(add(self.N,self.phi_i), 1)
 
     def distribute_phi_i_j(self,):
         phi_i_j = sum_genereator(self.phi_i, 10, self.e)
@@ -938,19 +965,19 @@ class Computer:
         self.psi_inv = powmod(self.psi, -1, self.e)
 
     def generate_d_i(self,):
-        self.d_i = divide(-self.phi_i*self.psi_inv, self.e)
+        self.d_i = divide(-multiply(self.phi_i,self.psi_inv), self.e)
         if self.id == 1:
-            self.d_i = divide(1-self.phi_i*self.psi_inv, self.e)
+            self.d_i = divide(1-multiply(self.phi_i,self.psi_inv), self.e)
     
     def generate_message_i(self,message):
-        self.network.nodes[0].receive_message_i(self.id, powmod(message,self.d_i*self.e,self.N))                            
+        self.network.nodes[0].receive_message_i(self.id, powmod(message,multiply(self.d_i,self.e),self.N))                            
 
     #message is the message to compare to
     def process_messages(self,message):
         m_prime = mod(reduce(multiply,self.message_i), self.N)
         correct = n
         for i in range(n):
-            if mod(message, self.N) == mod(multiply(m_prime, powmod(message, i*self.e, self.N)),self.N):
+            if mod(message, self.N) == mod(multiply(m_prime, powmod(message, multiply(i,self.e), self.N)),self.N):
                 correct = i
                 break
         assert correct != n

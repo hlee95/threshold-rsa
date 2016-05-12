@@ -163,11 +163,6 @@ def hao_signing_test():
     network.nodes[5].change_choice(True)
     network.sign(500)
 
-    print "\n signature share generation"
-    network.nodes[5].signature_share_generation(13223)
-    print "\n signature share generation"
-    network.nodes[2].signature_share_generation(523508)
-
 
 def hao_key_generation_test():
     print "---------------------------------------"

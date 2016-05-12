@@ -282,6 +282,11 @@ class Network:
         for computer in I:
             print "signature " + str(computer.id) + " " + str(computer.signature)
 
+        real_d = reduce(add, [computer.d_i for computer in self.nodes])
+        expected_signature = powmod(message, real_d, self.nodes[0].N)
+        print expected_signature
+        assert expected_signature == self.nodes[0].signature
+
     '''
     Implements the subset presigning algorithm in multiple phases.
     I is the set of k agreeing parties,

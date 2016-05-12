@@ -2,9 +2,9 @@ from helpers import *
 
 # global variables
 # n = number of computers in the network
-n = 5
+n = 10
 # k = number of people who have to agree
-k = 2
+k = 4
 # g is an agreed upon element in Z*_n that has high order
 # g = 101 # TODO compute this
 # e = the public key
@@ -495,9 +495,9 @@ class Computer:
         for h in xrange(n):
             if h != self.id:
                 # Don't use mpz because mpz doesn't play nice with floats
-                n_j = multiply(n_j,h + 1)
-                bottom = multiply(bottom,h - self.id)
-        n_j = divide(n_j,bottom)
+                n_j = multiply(multiply(n_j,h + 1),powmod(h-self.id,-1, self.bgw.M))
+        #        bottom = multiply(bottom,h - self.id)
+        #n_j = divide(n_j,bottom)
 
         self.bgw.n_j = mod(n_j, self.bgw.M)
 
@@ -704,9 +704,9 @@ class Computer:
         for computer in self.I:
             if computer.id == self.id:
                 continue
-            lambda_t_i = multiply(lambda_t_i, computer.id + 1)
-            bottoms = multiply(bottoms,computer.id - self.id)
-        lambda_t_i = divide(lambda_t_i,bottoms)
+            lambda_t_i = multiply(multiply(lambda_t_i, computer.id + 1),powmod(computer.id - self.id,-1,self.M))
+            #bottoms = multiply(bottoms,computer.id - self.id)
+        #lambda_t_i = divide(lambda_t_i,bottoms)
         lambda_t_i = mod(lambda_t_i, self.M)
         #print "lambda_t_i",lambda_t_i
         self.presigning_data[self.I].lambda_t_i = lambda_t_i
@@ -772,13 +772,13 @@ class Computer:
 
         
         
-        for j in [1,3,4]:
-            fsum = 0
-            for i in [0,2]:
-                fsum=mod(add(fsum,multiply(self.network.nodes[i].f_i_j[j],self.network.nodes[i].presigning_data[self.I].lambda_t_i)),self.M)
-            print "fsum",fsum
-            print "dsum",self.network.nodes[j].d_i
-            assert fsum == self.network.nodes[j].d_i
+        #for j in [1,3,4]:
+        #    fsum = 0
+        #    for i in [0,2]:
+        #        fsum=mod(add(fsum,multiply(self.network.nodes[i].f_i_j[j],self.network.nodes[i].presigning_data[self.I].lambda_t_i)),self.M)
+        #    print "fsum",fsum
+        #    print "dsum",self.network.nodes[j].d_i
+        #    assert fsum == self.network.nodes[j].d_i
         assert mod(subtract(ssum, dsum),self.M) == 0
 
         signature_share = self.signature_share_generation(self.dummy_message)

@@ -135,7 +135,7 @@ def hao_signing_test():
     print "---------------------------------------"
     print "SIGNING TEST"
     print "---------------------------------------"
-    network = Network([0])
+    network = Network(range(4, 7))
     network.setup()
 
     d_sum = 0
@@ -154,15 +154,15 @@ def hao_signing_test():
     network.nodes[2].change_choice(True)
     network.sign(200)
     print "\nTry with same 4 people."
-    network.nodes[3].change_choice(True)
+    network.nodes[8].change_choice(True)
     network.sign(300)
     print "\nRemove one person."
-    network.nodes[2].change_choice(False)
+    network.nodes[5].change_choice(False)
     network.sign(400)
     print "\nAdd back in the removed person."
-    network.nodes[2].change_choice(True)
+    network.nodes[5].change_choice(True)
     network.sign(500)
-
+    
     print "\n signature share generation"
     network.nodes[1].signature_share_generation(13223)
     print "\n signature share generation"

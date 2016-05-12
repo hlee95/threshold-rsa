@@ -283,9 +283,17 @@ class Network:
             print "signature " + str(computer.id) + " " + str(computer.signature)
 
         real_d = reduce(add, [computer.d_i for computer in self.nodes])
+        p = reduce(add, [computer.p_i for computer in self.nodes])
+        q = reduce(add, [computer.q_i for computer in self.nodes])
+        assert(multiply(p, q) == self.nodes[0].N)
+        phi_N = multiply(p-1, q-1)
         expected_signature = powmod(message, real_d, self.nodes[0].N)
+        observed_signature = self.nodes[I[0].id].signature
         print expected_signature
-        assert expected_signature == self.nodes[0].signature
+        print observed_signature
+        #verification = powmod(observed_signature, self.nodes[0].e, self.nodes[0].N)
+        #print "verification: s^e", verification
+        assert expected_signature == observed_signature
 
     '''
     Implements the subset presigning algorithm in multiple phases.
@@ -402,8 +410,7 @@ class Computer:
         self.presigning_data = {} # maps subset -> this computer's presigning data for that subset
 
         # Variables for share generation/verification/combining
-        self.sigmas = [] # contains tuples of the form (id, sigma)
-                         # where sigma is itself a tuple of the form (signature, proof)
+        self.sigmas = [] # contains tuples of the form (c_i, [m, (-,-), c_i, r, c, id])
                          # there should be k items in self.sigmas
 
         self.signature = None # the final signature produced after combining k shares
@@ -879,6 +886,9 @@ class Computer:
 
         self.presigning_data[self.I].D_I = (self.presigning_data[self.I].x_I, h_sigma_array)
 
+        # clear self.sigmas
+        self.sigmas = []
+
         print 'S_I_t_i', self.presigning_data[self.I].S_I_t_i
         print 'I', self.I
 
@@ -953,8 +963,7 @@ class Computer:
         # broadcasted and verified already, and that they are
         # stored in self.sigmas
 
-        # Calculate the product of c_{t_i} for t_i in I
-        product_c_t_i = mod(reduce(multiply, map(lambda sigma: sigma[1][0], self.sigmas)), self.N)
+        product_c_t_i = mod(reduce(multiply, [sigma[0] for sigma in self.sigmas]), self.N)
         # Calculate the final signature = m^(-x_I * M) * the product
         self.signature = mod(multiply(product_c_t_i, powmod(m, -1 * multiply(self.presigning_data[self.I].x_I, self.M), self.N)), self.N)
 

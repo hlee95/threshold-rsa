@@ -304,6 +304,19 @@ class Network:
             t_i.subset_presigning_algorithm_phase_2()
         for t_i in I:
             t_i.subset_presigning_algorithm_phase_3()
+        # X_I should be given, check that sum s in I = sum d in I'+x_I*M    
+        ssum = 0
+        dsum = 0
+        xi = 0
+        M = 0
+        for comp in I:
+            ssum = add(ssum,comp.presigning_data[comp.I].s_t_i)
+            xi = comp.presigning_data[comp.I].x_I
+            M = comp.M
+        for comp in [computer for computer in self.nodes if computer not in I]:
+            dsum = add(dsum,comp.d_i)
+        assert ssum == dsum + xi*M
+            
         for t_i in I:
             t_i.subset_presigning_algorithm_phase_4()
 

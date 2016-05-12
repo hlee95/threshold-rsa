@@ -17,32 +17,48 @@ Returns a random prime number in the range [start, end)
 
 primes = cPickle.load(open("picklePrimesSmall.pkl","r"))
 
+'''
+Returns a random number within a start and end
+'''
 def get_random_prime(start,end):
     i = random.randint(start,end) # better random nunber generator
     while not gmpy2.is_prime(i):
         i +=1
     return i
 
+'''
+Returns a safe prime within a start and end. 
+
+Safe prime is p = 2q+1 where q is prime
+'''
 def get_random_safe_prime(start,end):
     i = random.randint(start,end) # better random nunber generator
     while not (gmpy2.is_prime(i) and gmpy2.is_prime(gmpy2.t_div((i-1),2))):
         i +=1
     return i
 
-# returns all primes in (a,b]
-# only works up to 1,000,000,000
+'''
+Returns all primes in (a,b]
+
+only works up to 1,000,000,000
+'''
 def get_primes_in_range(a,b):
     start = np.searchsorted(primes, a)+1
     end = np.searchsorted(primes, b)+1
     return primes[start:end].tolist()
 
-# returns a number between 1 and n that is relatively prime to n
+'''
+Returns a number between 1 and n that is relatively prime to n
+'''
 def get_relatively_prime_int(n):
     guess = get_random_int(n)
     while GCD(guess,n)!=1:
         guess = get_random_int(n)
     return guess
 
+'''
+Returns a number between 1 and sqrt(n) that is relatively prime to n
+'''
 def get_relatively_prime_int_small(n):
     n_prime = gmpy2.isqrt(n)
     guess = get_random_int(n_prime)
@@ -50,10 +66,15 @@ def get_relatively_prime_int_small(n):
         guess = get_random_int(n_prime)
     return guess
 
+'''
+Returns the GCD of two numbers
+'''
 def GCD(a, b):
     return gmpy2.gcd(gmpy2.mpz(a), gmpy2.mpz(b))
 
-
+'''
+Breaks up p into n pieces that adds up to p mod M
+'''
 def getShares(p,n,M):
     base = p/n
     shares = [0]*n
@@ -121,7 +142,9 @@ def mod(x, m):
         remainder = gmpy2.add(remainder, m)
     return remainder
 
-#[d_1, d_2...d_n] such that sum [] = d mod N
+'''
+[d_1, d_2...d_n] such that sum [] = d mod N
+'''
 def sum_genereator(d, n, N):
     d_i = []
     #choose random values for first n-1

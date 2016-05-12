@@ -182,12 +182,14 @@ def hao_key_generation_test():
 
 
 def run_all_tests():
-    #hanna_subset_presigning_test()
+
+    #brian_dealing_tests()
     #hanna_bgw_test()
+    
+    #hanna_subset_presigning_test()
     #hanna_generate_pq_test()
     hao_signing_test()
     #hao_key_generation_test()
-    #brian_dealing_tests()
     #hao_key_generation_test()
     print "---------------------------------------"
     print "DONE WITH TESTS"

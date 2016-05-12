@@ -2,9 +2,9 @@ from helpers import *
 
 # global variables
 # n = number of computers in the network
-n = 10
+n = 5
 # k = number of people who have to agree
-k = 4
+k = 2
 # g is an agreed upon element in Z*_n that has high order
 # g = 101 # TODO compute this
 # e = the public key
@@ -491,14 +491,13 @@ class Computer:
         N_j = mod(add(multiply(sum_f, sum_g), sum_h), self.bgw.M)
         # Calculate n_j as described in section 4.3.2
         n_j = N_j
+        bottom = 1
         for h in xrange(n):
             if h != self.id:
                 # Don't use mpz because mpz doesn't play nice with floats
                 n_j = multiply(n_j,h + 1)
-        for h in xrange(n):
-            if h != self.id:
-                # Don't use mpz because mpz doesn't play nice with floats
-                n_j = divide(n_j,h - self.id)
+                bottom = multiply(bottom,h - self.id)
+        n_j = divide(n_j,bottom)
 
         self.bgw.n_j = mod(n_j, self.bgw.M)
 
@@ -589,13 +588,13 @@ class Computer:
         # calculate f_i_j for each other user and set their values
         # f_i_j = f_i(j)
         for user in S: # for user in set
-            if user != self: # those that are not you
-                userid = user.id+1
-                f_i_j = 0
-                for c in xrange(k-1,-1,-1):
-                    f_i_j+=multiply(self.a_i_j[c],powmod(userid,c,M))
-                #print "f_i_j for user",userid,"is",f_i_j#%M
-                user.f_i_j[self.id]=f_i_j#%M
+            #if user != self: # those that are not you
+            userid = user.id+1
+            f_i_j = 0
+            for c in xrange(k-1,-1,-1):
+                f_i_j+=multiply(self.a_i_j[c],powmod(userid,c,M))
+            #print "f_i_j for user",userid,"is",f_i_j#%M
+            user.f_i_j[self.id]=f_i_j
         for user in S:
             for j in xrange(0,k):
                 user.b_i_j[self.id][j]=powmod(g,self.a_i_j[j],self.N)
@@ -608,26 +607,15 @@ class Computer:
         # check to ensure people sent out the correct values
         selfid = self.id+1
         for user_i in S:
-            if user_i != self:
-                user_iid = user_i.id+1
-                #print "checking user ",user_iid
-                #print "f_i_j user",user_i.id,self.f_i_j[user_i.id]
-                #print "g=",g,"self.f_i_j[user_i.id]=",self.f_i_j[user_i.id],"N=",N
-                g_exp_f_i_j = powmod(g,self.f_i_j[user_i.id], self.N)
-                #print self.f_i_j[user_i.id]
-                checker = gmpy2.mpz(1)
-                for t in xrange(k):
-                    #print "b_i_j[t] t = ",t,self.b_i_j[user_i.id][t]
-                    #print "new multiplicand to checker = ",powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N)
-                    checker=multiply(checker,powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,self.N),self.N))
-                    #print "powmod(selfid,t,N)",powmod(selfid,t,N)
-                    #print powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,N),N)
-                checker = mod(checker,self.N)
-                #print "checker",checker
-                #print "g^f_i_j",g_exp_f_i_j
-                #print
-                if checker != g_exp_f_i_j:
-                    return False
+            #if user_i != self:
+            user_iid = user_i.id+1
+            g_exp_f_i_j = powmod(g,self.f_i_j[user_i.id], self.N)
+            checker = gmpy2.mpz(1)
+            for t in xrange(k):
+                checker=multiply(checker,powmod(self.b_i_j[user_i.id][t],powmod(selfid,t,self.N),self.N))
+            checker = mod(checker,self.N)
+            if checker != g_exp_f_i_j:
+                return False
         # set the final values
         self.S["k"] = k
         self.S["M"] = M
@@ -712,15 +700,15 @@ class Computer:
     def subset_presigning_algorithm_phase_1(self):
         # Compute lambda_t_i
         lambda_t_i = 1
+        bottoms = 1
         for computer in self.I:
             if computer.id == self.id:
                 continue
             lambda_t_i = multiply(lambda_t_i, computer.id + 1)
-        for computer in self.I:
-            if computer.id == self.id:
-                continue
-            lambda_t_i = divide(lambda_t_i, computer.id - self.id) # We need the "+1" because otherwise we could get 0
+            bottoms = multiply(bottoms,computer.id - self.id)
+        lambda_t_i = divide(lambda_t_i,bottoms)
         lambda_t_i = mod(lambda_t_i, self.M)
+        #print "lambda_t_i",lambda_t_i
         self.presigning_data[self.I].lambda_t_i = lambda_t_i
 
         # Compute s_t_i = (sum(f_i_j) * lambda_t_i) % M
@@ -744,29 +732,53 @@ class Computer:
     '''
     def subset_presigning_algorithm_phase_2(self):
         # Compute and broadcast the signature share.
+        dsum = 0
+        psum = 0
+        qsum = 0
+        for computer in self.network.nodes:
+            dsum = add(dsum,computer.d_i)
+            psum = add(psum,computer.p_i)
+            qsum = add(qsum,computer.q_i)
+        assert mod(multiply(dsum,self.e),multiply(psum-1,qsum-1))==1
         print 'check i'
         ssum = 0
-        dsum = 0
+        
         for computer in self.I:
             ssum = add(ssum, computer.presigning_data[self.I].S_I_t_i)
 
         intersum = 0
         for computer1 in self.I:
             for computer2 in self.I_prime:
-                intersum = add(intersum, multiply(computer1.f_i_j[computer2.id],computer1.presigning_data[self.I].lambda_t_i))                
+                intersum = add(intersum, multiply(computer1.f_i_j[computer2.id],computer1.presigning_data[self.I].lambda_t_i))
+        assert mod(intersum,self.M)== mod(ssum,self.M)
 
         bsum = 0
         for computer1 in self.I:
-            bsum = add(bsum, multiply(computer1.f_i_j[self.id],computer1.presigning_data[self.I].lambda_t_i))                
-            
+            bsum = add(bsum, multiply(computer1.f_i_j[self.id],computer1.presigning_data[self.I].lambda_t_i))
+        
+        dsum = 0
         for computer in self.I_prime:    
             dsum = add(dsum, computer.d_i)
+        dsum = mod(dsum,self.M)
                                     
-        print mod(mod(bsum,self.M),self.e)
-        print mod(mod(self.d_i,self.M),self.e)     
-        print mod(mod(intersum,self.M),self.e)
-        print mod(mod(ssum,self.M),self.e)
-        print mod(mod(dsum,self.M),self.e)
+        #print "bsum",mod(bsum,self.M)
+        #print "d_i",mod(self.d_i,self.M)    
+        #print "intersum",mod(intersum,self.M)
+
+            
+        #print "ssum",mod(ssum,self.M)
+        #print "dsum",mod(dsum,self.M)
+
+
+        
+        
+        for j in [1,3,4]:
+            fsum = 0
+            for i in [0,2]:
+                fsum=mod(add(fsum,multiply(self.network.nodes[i].f_i_j[j],self.network.nodes[i].presigning_data[self.I].lambda_t_i)),self.M)
+            print "fsum",fsum
+            print "dsum",self.network.nodes[j].d_i
+            assert fsum == self.network.nodes[j].d_i
         assert mod(subtract(ssum, dsum),self.M) == 0
 
         signature_share = self.signature_share_generation(self.dummy_message)
@@ -795,8 +807,8 @@ class Computer:
         product_c_prime_t_i = mod(reduce(multiply,
             map(lambda sigma: sigma[0],
                 self.sigmas)), self.N)
-        print 'sigmas', map(lambda sigma: sigma[0],self.sigmas)
-        print 'product', product_c_prime_t_i
+        #print 'sigmas', map(lambda sigma: sigma[0],self.sigmas)
+        #print 'product', product_c_prime_t_i
         # Calculate 2^(e*M) % N
         two_e_M = powmod(2, multiply(self.e, self.M), self.N)
         # Search for the value of x_I that makes the product = 2 * (2^(e*M*x_I))
@@ -842,6 +854,7 @@ class Computer:
                     h_sigma_array.append((id_s, h_t_i, sigma[0]))
                     break
         # Make sure that we got k tuples after matching, otherwise there are unmatched values.
+        print len(h_sigma_array), k
         if len(h_sigma_array) != k:
             raise RuntimeError("Couldn't match h_t_i and sigma values appropriately.")
 
@@ -943,11 +956,11 @@ class Computer:
     def create_phi_i(self,):
         #step 1
         self.phi_i =-add(self.p_i,self.q_i)
-        if self.id == 1:
+        if self.id == 0:
             self.phi_i = add(add(self.N,self.phi_i), 1)
 
     def distribute_phi_i_j(self,):
-        phi_i_j = sum_genereator(self.phi_i, 10, self.e)
+        phi_i_j = sum_genereator(self.phi_i, n, self.e)
         assert mod(reduce(add, phi_i_j), self.e) == mod(self.phi_i,self.e)
         for computer in self.network.nodes:
             computer.receive_phi(self.id, phi_i_j[computer.id])
@@ -965,9 +978,9 @@ class Computer:
         self.psi_inv = powmod(self.psi, -1, self.e)
 
     def generate_d_i(self,):
-        self.d_i = divide(-multiply(self.phi_i,self.psi_inv), self.e)
-        if self.id == 1:
-            self.d_i = divide(1-multiply(self.phi_i,self.psi_inv), self.e)
+        self.d_i = floor_divide(-multiply(self.phi_i,self.psi_inv), self.e)
+        if self.id == 0:
+            self.d_i = floor_divide(1-multiply(self.phi_i,self.psi_inv), self.e)
     
     def generate_message_i(self,message):
         self.network.nodes[0].receive_message_i(self.id, powmod(message,multiply(self.d_i,self.e),self.N))                            

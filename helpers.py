@@ -101,6 +101,9 @@ Divide x / y
 def divide(x, y):
     return gmpy2.t_div(gmpy2.mpz(x), gmpy2.mpz(y))
 
+def floor_divide(x, y):
+    return gmpy2.f_div(gmpy2.mpz(x), gmpy2.mpz(y))
+
 '''
 Subtract x - y
 '''

@@ -31,7 +31,7 @@ def brian_parallel_trial_division():
 #brian_parallel_trial_division()
 
 def brian_primality_test():
-    network = Network() 
+    network = Network()
     product_prime_test = False
     counter = 0
     while not product_prime_test:
@@ -115,13 +115,13 @@ def hanna_bgw_test():
         for computer in network.nodes:
             test_N = add(test_N, computer.bgw.n_j)
             #print "n_j: ", computer.bgw.n_j
-        print test_N == real_N    
+        print test_N == real_N
         test_N = mod(test_N, M)
         #print "test_N: ", test_N
         print test_N == real_N
         real_N = mod(real_N,M)
         print test_N == real_N
-        return 
+        return
     print trues
 
 def hanna_generate_pq_test():
@@ -162,9 +162,9 @@ def hao_signing_test():
     print "\nAdd back in the removed person."
     network.nodes[5].change_choice(True)
     network.sign(500)
-    
+
     print "\n signature share generation"
-    network.nodes[1].signature_share_generation(13223)
+    network.nodes[5].signature_share_generation(13223)
     print "\n signature share generation"
     network.nodes[2].signature_share_generation(523508)
 

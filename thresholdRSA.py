@@ -312,22 +312,22 @@ class Network:
             user.distribute_sum_phi_j()
         for user in self.nodes:
             user.generate_phi_and_psi()
-    
-        #for checks         
+
+        #for checks
         phisum = 0
         for user in self.nodes:
             phisum = add(phisum,user.phi_i)
         for user in self.nodes:
-            assert 0 == mod(subtract(user.psi,phisum),user.e)    
-            
+            assert 0 == mod(subtract(user.psi,phisum),user.e)
+
         for user in self.nodes:
             user.generate_d_i()
 
         # trial decryption 5.2.6
         message = 1234567
         for user in self.nodes:
-            user.generate_message_i(message)        
-        
+            user.generate_message_i(message)
+
         # user 1 computes product
         self.nodes[0].process_messages(message)
 
@@ -647,8 +647,8 @@ class Computer:
     Receive a broadcast of a different computer's sigma_I_t_i
     for the dummy message during the presigning phase.
     '''
-    def receive_presigning_sigma_I_t_i(self, id_and_sigma):
-        self.presigning_data[self.I].received_sigma_I_t_i.append(id_and_sigma)
+    #def receive_presigning_sigma_I_t_i(self, id_and_sigma):
+    #    self.presigning_data[self.I].received_sigma_I_t_i.append(id_and_sigma)
 
     '''
     Receive a broadcast of a different computer's h_t_i
@@ -742,7 +742,7 @@ class Computer:
         assert mod(multiply(dsum,self.e),multiply(psum-1,qsum-1))==1
         print 'check i'
         ssum = 0
-        
+
         for computer in self.I:
             ssum = add(ssum, computer.presigning_data[self.I].S_I_t_i)
 
@@ -755,23 +755,23 @@ class Computer:
         bsum = 0
         for computer1 in self.I:
             bsum = add(bsum, multiply(computer1.f_i_j[self.id],computer1.presigning_data[self.I].lambda_t_i))
-        
+
         dsum = 0
-        for computer in self.I_prime:    
+        for computer in self.I_prime:
             dsum = add(dsum, computer.d_i)
         dsum = mod(dsum,self.M)
-                                    
+
         #print "bsum",mod(bsum,self.M)
-        #print "d_i",mod(self.d_i,self.M)    
+        #print "d_i",mod(self.d_i,self.M)
         #print "intersum",mod(intersum,self.M)
 
-            
+
         #print "ssum",mod(ssum,self.M)
         #print "dsum",mod(dsum,self.M)
 
 
-        
-        
+
+
         #for j in [1,3,4]:
         #    fsum = 0
         #    for i in [0,2]:
@@ -848,10 +848,11 @@ class Computer:
         if len(self.sigmas) != k or len(self.presigning_data[self.I].received_h_t_i) != k:
             raise RuntimeError("Didn't receive k sigmas or h_t_i values.")
         # Match them up and aggregate into h_sigma_array
-        for id_s, sigma in self.sigmas:
+        for sigma, proof in self.sigmas:
+            id_s = proof[-1] # the id is the last thing in the proof array
             for id_h, h_t_i in self.presigning_data[self.I].received_h_t_i.items():
                 if id_s == id_h:
-                    h_sigma_array.append((id_s, h_t_i, sigma[0]))
+                    h_sigma_array.append((id_s, h_t_i, sigma))
                     break
         # Make sure that we got k tuples after matching, otherwise there are unmatched values.
         print len(h_sigma_array), k
@@ -952,7 +953,7 @@ class Computer:
 
     def receive_message_i(self, from_id, message):
         self.message_i[from_id] = message
-        
+
     def create_phi_i(self,):
         #step 1
         self.phi_i =-add(self.p_i,self.q_i)
@@ -981,9 +982,9 @@ class Computer:
         self.d_i = floor_divide(-multiply(self.phi_i,self.psi_inv), self.e)
         if self.id == 0:
             self.d_i = floor_divide(1-multiply(self.phi_i,self.psi_inv), self.e)
-    
+
     def generate_message_i(self,message):
-        self.network.nodes[0].receive_message_i(self.id, powmod(message,multiply(self.d_i,self.e),self.N))                            
+        self.network.nodes[0].receive_message_i(self.id, powmod(message,multiply(self.d_i,self.e),self.N))
 
     #message is the message to compare to
     def process_messages(self,message):
@@ -995,7 +996,7 @@ class Computer:
                 break
         assert correct != n
         self.d_i +=correct
-        
+
 
     def __str__(self):
         return "Computer "+str(self.id)

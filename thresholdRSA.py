@@ -1097,19 +1097,27 @@ class Computer:
     def __str__(self):
         return "Computer "+str(self.id)
 
-if name=="__main__":
+if __name__=="__main__":
     
     n=input('Enter how many parties are there, ex 8: ')
     k=input('Set the threshold of how many parties must agree to produce a signature, ex 3: ')
     agree = raw_input('Indicate which parties agree, ex: 0,2,4,5: ')
-    agreelist = [int(i) for i in agree.split('.')]
+    agreelist = [int(i) for i in agree.split(',')]
 
     network = Network(agreelist)
     network.setup()
     while True:
         message = input('what is the message, ex 100? ')
         network.sign(message)
-        choiceChange = input("if you would like any user to change their mind, enter their number: ")
-        network.nodes[choiceChange].change_choice(not network.nodes[choiceChange].agree)
+        agree = raw_input('Indicate which parties agree, ex: 0,2,4,5: ')
+        if agree == "":
+            agreelist = []
+        else:
+            agreelist = [int(i) for i in agree.split(',')]
+        for computer in network.nodes:
+            if computer.id in agreelist:
+                computer.change_choice(True)
+            else:
+                computer.change_choice(False)
         
 

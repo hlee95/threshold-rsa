@@ -195,6 +195,11 @@ def run_all_tests():
     print "DONE WITH TESTS"
     print "---------------------------------------"
 
+
+n=input('Enter how many parties are there, ex 8')
+k=input('Set the threshold of how many parties must agree to produce a signature, ex 3')
+agree = input('Indicate which parties agree, ex: [0,2,4,5]')
+
 # Run everything!
 run_all_tests()
 
